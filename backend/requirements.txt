@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+sqlalchemy
+pydantic
+Office365-REST-Python-Client
+python-multipart
+python-dotenv
+xhtml2pdf

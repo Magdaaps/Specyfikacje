@@ -1,0 +1,1524 @@
+Option Explicit
+
+' ==== KONFIG ====
+Private Const SH_PROD As String = "Produkty"
+Private Const SH_SUR  As String = "Surowce"
+
+' Produkty
+Private Const PROD_NAME_COL As String = "B"
+Private Const PROD_SUROWCE_FROM As String = "D"
+Private Const PROD_SUROWCE_TO   As String = "W"
+Private Const PROD_ALERG_OUT_FROM As String = "DW"
+Private Const PROD_ALERG_OUT_TO   As String = "EJ"
+Private Const PROD_ALERG_HEADER_ROW As Long = 2   ' nazwy alergenów w Produkty w WIERSZU 2
+                                                  ' dane produktów od wiersza 3
+
+' Surowce
+Private Const SUR_NAME_COL As String = "B"
+Private Const SUR_ALERG_FROM As String = "AN"
+Private Const SUR_ALERG_TO   As String = "BA"
+Private Const SUR_ALERG_HEADER_ROW As Long = 1
+
+' Debug (ustaw True, jeśli chcesz log do Immediate)
+Private Const DEBUG_IMM As Boolean = True
+
+' ==== POMOCNICZE ====
+
+Private Function LastRow(ws As Worksheet, colLetter As String) As Long
+    Dim c As Long: c = ws.Range(colLetter & "1").Column
+    LastRow = ws.Cells(ws.Rows.Count, c).End(xlUp).Row
+End Function
+
+Private Function CleanStr(ByVal s As String) As String
+    Dim t As String
+    t = Replace(CStr(s), ChrW(160), " ")   ' NBSP
+    t = Replace(t, ChrW(8203), "")         ' zero-width
+    t = Replace(t, vbTab, " ")
+    t = Trim$(t)
+    Do While InStr(t, "  ") > 0
+        t = Replace(t, "  ", " ")
+    Loop
+    CleanStr = t
+End Function
+
+Private Function StripDiacritics(ByVal s As String) As String
+    Dim i As Long
+    Dim src As String: src = "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"
+    Dim dst As String: dst = "acelnoszzACELNOSZZ"
+    For i = 1 To Len(src)
+        s = Replace(s, Mid$(src, i, 1), Mid$(dst, i, 1))
+    Next
+    StripDiacritics = s
+End Function
+
+Private Function NormalizeKey(ByVal s As String) As String
+    Dim t As String
+    t = LCase$(StripDiacritics(CleanStr(s)))
+    t = Replace(t, "-", " ")
+    t = Replace(t, "_", " ")
+    Do While InStr(t, "  ") > 0
+        t = Replace(t, "  ", " ")
+    Loop
+    NormalizeKey = Replace(t, " ", "")
+End Function
+
+Private Function NormalizeStatus(ByVal txt As String) As String
+    Dim t As String
+    t = LCase$(Trim$(CleanStr(txt)))
+    If t Like "zawiera*" Or t = "tak" Or t = "yes" Or t = "1" Or t Like "*contains*" Then
+        NormalizeStatus = "Zawiera"
+    ElseIf t Like "mo*e zawiera*" Or t Like "moze zawiera*" Or t Like "może zawiera*" _
+        Or t Like "*sladowe*" Or t Like "*śladowe*" Or t Like "*slad*" Or t Like "*ślad*" _
+        Or t Like "*may contain*" Then
+        NormalizeStatus = "Może zawierać"
+    ElseIf t = "" Or t Like "nie zawiera*" Or t Like "brak*" Or t = "-" Or t = "0" Or t = "nie" Or t = "no" Then
+        NormalizeStatus = "Nie zawiera"
+    Else
+        NormalizeStatus = "Może zawierać" ' zachowawczo
+    End If
+End Function
+
+Private Function CombineStatus(curr As String, incoming As String) As String
+    If curr = "Zawiera" Or incoming = "Zawiera" Then
+        CombineStatus = "Zawiera"
+    ElseIf curr = "Może zawierać" Or incoming = "Może zawierać" Then
+        CombineStatus = "Może zawierać"
+    Else
+        CombineStatus = "Nie zawiera"
+    End If
+End Function
+
+Private Function ReadNumberGTZero(v As Variant) As Boolean
+    On Error GoTo EH
+    If IsEmpty(v) Then Exit Function
+    If IsNumeric(v) Then
+        ReadNumberGTZero = (CDbl(v) > 0#)
+        Exit Function
+    End If
+    Dim t As String: t = Replace(CStr(v), " ", "")
+    Dim isPct As Boolean: isPct = (InStr(t, "%") > 0)
+    t = Replace(t, "%", "")
+    t = Replace(t, ",", ".")
+    If IsNumeric(t) Then
+        Dim x As Double: x = CDbl(t)
+        If isPct Then x = x / 100#
+        ReadNumberGTZero = (x > 0#)
+    End If
+    Exit Function
+EH:
+    ReadNumberGTZero = False
+End Function
+
+Private Sub BuildHeaders(ws As Worksheet, headerRow As Long, colFrom As String, colTo As String, _
+                         ByRef raw() As String, ByRef norm() As String, ByRef cols() As Long)
+    Dim c As Long, cFrom As Long, cTo As Long, i As Long
+    cFrom = ws.Range(colFrom & headerRow).Column
+    cTo = ws.Range(colTo & headerRow).Column
+    ReDim raw(1 To cTo - cFrom + 1)
+    ReDim norm(1 To cTo - cFrom + 1)
+    ReDim cols(1 To cTo - cFrom + 1)
+    i = 0
+    For c = cFrom To cTo
+        i = i + 1
+        raw(i) = CStr(ws.Cells(headerRow, c).Value)
+        norm(i) = NormalizeKey(raw(i))
+        cols(i) = c
+    Next c
+End Sub
+
+Private Function DictIndexByNorm(norm() As String) As Object
+    Dim d As Object: Set d = CreateObject("Scripting.Dictionary")
+    Dim i As Long
+    For i = LBound(norm) To UBound(norm)
+        If Len(norm(i)) > 0 Then If Not d.Exists(norm(i)) Then d.Add norm(i), i
+    Next i
+    Set DictIndexByNorm = d
+End Function
+
+' --- WYKRYWANIE WIERSZA NAGŁÓWKÓW SUROWCÓW (D..W) ---
+Private Function DetectIngredientHeaderRow(wsP As Worksheet, dictS As Object) As Long
+    ' sprawdza wiersze 1..5 i wybiera ten z największą liczbą trafień do "Surowce!B"
+    Dim cFrom As Long, cTo As Long, r As Long, c As Long
+    cFrom = wsP.Range(PROD_SUROWCE_FROM & "1").Column
+    cTo = wsP.Range(PROD_SUROWCE_TO & "1").Column
+    
+    Dim bestRow As Long: bestRow = 1
+    Dim bestHit As Long: bestHit = -1
+    
+    For r = 1 To 5
+        Dim hits As Long: hits = 0
+        For c = cFrom To cTo
+            Dim hdr As String: hdr = wsP.Cells(r, c).Value
+            Dim key As String: key = NormalizeKey(hdr)
+            If key <> "" Then
+                If dictS.Exists(key) Then
+                    hits = hits + 1
+                Else
+                    ' dopasowanie przybliżone: zawiera/rozpoczyna się
+                    Dim k As Variant
+                    For Each k In dictS.Keys
+                        If (InStr(key, k) > 0) Or (Left$(k, Len(key)) = key) Or (Left$(key, Len(k)) = k) Then
+                            hits = hits + 1
+                            Exit For
+                        End If
+                    Next k
+                End If
+            End If
+        Next c
+        If hits > bestHit Then
+            bestHit = hits
+            bestRow = r
+        End If
+        If DEBUG_IMM Then Debug.Print "HEADER_SCAN r=" & r & " hits=" & hits
+    Next r
+    If DEBUG_IMM Then Debug.Print "HEADER_SELECTED r=" & bestRow & " (hits=" & bestHit & ")"
+    DetectIngredientHeaderRow = bestRow
+End Function
+
+' --- DOPASOWANIE SUROWCA DO WIERSZA W "SUROWCE" ---
+Private Function FindSurowiecRow(dictS As Object, ByVal headerText As String) As Long
+    Dim key As String: key = NormalizeKey(headerText)
+    If key = "" Then Exit Function
+    If dictS.Exists(key) Then
+        FindSurowiecRow = dictS(key)
+        Exit Function
+    End If
+    ' zawiera/startsWith w obie strony (proste, ale skuteczne)
+    Dim k As Variant
+    For Each k In dictS.Keys
+        If (InStr(key, k) > 0) Or (Left$(k, Len(key)) = key) Or (Left$(key, Len(k)) = k) Then
+            FindSurowiecRow = dictS(k)
+            Exit Function
+        End If
+    Next k
+End Function
+
+' ==== MAKRO GŁÓWNE ====
+Public Sub AnalizaAlergenow()
+    Dim wsP As Worksheet, wsS As Worksheet
+    On Error Resume Next
+    Set wsP = ThisWorkbook.Worksheets(SH_PROD)
+    Set wsS = ThisWorkbook.Worksheets(SH_SUR)
+    On Error GoTo 0
+    If wsP Is Nothing Or wsS Is Nothing Then
+        MsgBox "Brak arkuszy 'Produkty' lub 'Surowce'.", vbCritical
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    Application.EnableEvents = False
+    
+    Dim lastP As Long, lastS As Long
+    lastP = LastRow(wsP, PROD_NAME_COL)
+    lastS = LastRow(wsS, SUR_NAME_COL)
+    If lastP < 3 Or lastS < 2 Then GoTo CleanExit
+    
+    ' Indeks surowców (Surowce!B)
+    Dim dictS As Object: Set dictS = CreateObject("Scripting.Dictionary")
+    Dim r As Long, nm As String
+    For r = 2 To lastS
+        nm = NormalizeKey(wsS.Cells(r, wsS.Range(SUR_NAME_COL & "1").Column).Value)
+        If nm <> "" Then If Not dictS.Exists(nm) Then dictS.Add nm, r
+    Next r
+    
+    ' Nagłówki alergenów (Produkty wiersz 2, Surowce wiersz 1)
+    Dim pRaw() As String, pNorm() As String, pCols() As Long
+    Dim sRaw() As String, sNorm() As String, sCols() As Long
+    BuildHeaders wsP, PROD_ALERG_HEADER_ROW, PROD_ALERG_OUT_FROM, PROD_ALERG_OUT_TO, pRaw, pNorm, pCols
+    BuildHeaders wsS, SUR_ALERG_HEADER_ROW, SUR_ALERG_FROM, SUR_ALERG_TO, sRaw, sNorm, sCols
+    Dim idxS As Object: Set idxS = DictIndexByNorm(sNorm)
+    
+    Dim nP As Long: nP = UBound(pCols)
+    Dim nS As Long: nS = UBound(sCols)
+    Dim mapSrcCol() As Long
+    ReDim mapSrcCol(1 To nP)
+    
+    Dim i As Long, nk As String, sIdx As Long
+    For i = 1 To nP
+        nk = pNorm(i)
+        If idxS.Exists(nk) Then
+            sIdx = idxS(nk)
+            mapSrcCol(i) = sCols(sIdx)
+        ElseIf i <= nS Then
+            mapSrcCol(i) = sCols(i)            ' fallback 1:1
+        Else
+            mapSrcCol(i) = 0
+        End If
+        If DEBUG_IMM Then Debug.Print "ALERG_MAP: P[" & i & "]=" & pRaw(i) & " -> Scol=" & mapSrcCol(i)
+    Next i
+    
+    ' >>> Klucz: wykryj właściwy WIERSZ nagłówków surowców w D:W
+    Dim ingHeaderRow As Long
+    ingHeaderRow = DetectIngredientHeaderRow(wsP, dictS)
+    
+    Dim cFrom As Long, cTo As Long, c As Long
+    cFrom = wsP.Range(PROD_SUROWCE_FROM & "1").Column
+    cTo = wsP.Range(PROD_SUROWCE_TO & "1").Column
+    Dim firstDataRow As Long: firstDataRow = PROD_ALERG_HEADER_ROW + 1  ' = 3
+    
+    Dim rowP As Long, prodName As String
+    For rowP = firstDataRow To lastP
+        prodName = CleanStr(wsP.Cells(rowP, wsP.Range(PROD_NAME_COL & "1").Column).Value)
+        If prodName = "" Then GoTo NextProduct
+        
+        Dim outStatus() As String
+        ReDim outStatus(1 To nP)
+        For i = 1 To nP: outStatus(i) = "Nie zawiera": Next i
+        
+        For c = cFrom To cTo
+            ' bierz tylko wartości > 0
+            If ReadNumberGTZero(wsP.Cells(rowP, c).Value) Then
+                Dim suHdr As String: suHdr = wsP.Cells(ingHeaderRow, c).Value
+                Dim suRow As Long: suRow = FindSurowiecRow(dictS, suHdr)
+                If suRow > 0 Then
+                    For i = 1 To nP
+                        Dim sc As Long: sc = mapSrcCol(i)
+                        Dim st As String
+                        If sc > 0 Then
+                            st = NormalizeStatus(wsS.Cells(suRow, sc).Value)
+                        Else
+                            st = "Nie zawiera"
+                        End If
+                        outStatus(i) = CombineStatus(outStatus(i), st)
+                    Next i
+                Else
+                    If DEBUG_IMM Then Debug.Print "NO_MATCH surowiec='" & suHdr & "' col=" & c
+                End If
+            End If
+        Next c
+        
+        ' zapis do Produkty (od wiersza 3)
+        For i = 1 To nP
+            wsP.Cells(rowP, pCols(i)).Value = outStatus(i)
+        Next i
+NextProduct:
+    Next rowP
+    
+ 
+
+CleanExit:
+    Application.EnableEvents = True
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+End Sub
+
+
+Option Explicit
+
+'==== Pomocnicza procedura – czyści zakres, uwzględniając komórki scalone ====
+Private Sub ClearRangeRespectMerges(rng As Range)
+    Dim c As Range
+    For Each c In rng
+        If c.MergeCells Then
+            If c.Address = c.MergeArea.Cells(1, 1).Address Then
+                c.MergeArea.ClearContents
+            End If
+        Else
+            c.ClearContents
+        End If
+    Next c
+End Sub
+
+'==== Główne makro ====
+Sub GenerujTabeleSurowcow()
+    Dim wsProd As Worksheet
+    Dim wsKarta As Worksheet
+    Dim currentRow As Long
+    Dim i As Long, col As Long
+    Dim colStart As Long, colEnd As Long
+    Dim n As Long
+    Dim arrSurowce() As Variant
+    Dim nazwa As String
+    Dim procent As Double
+    Dim kraj As String
+    Dim colCT As Long
+    Dim colHeader As Range
+    Dim headerRngKraje As Range
+    Dim maxRows As Long
+    Dim outRows As Long
+    Dim swapped As Boolean
+    Dim tmp1 As Variant, tmp2 As Variant, tmp3 As Variant
+    Dim hdr As String, nm As String
+    
+    Set wsProd = ThisWorkbook.Worksheets("Produkty")
+    Set wsKarta = ThisWorkbook.Worksheets("Karta produktu")
+    
+    currentRow = ActiveCell.Row
+    
+    
+    colStart = wsProd.Range("BB2").Column
+    colEnd = wsProd.Range("CD2").Column
+    
+    Set headerRngKraje = wsProd.Range("CP2:DL2")
+    colCT = wsProd.Range("DL2").Column
+    
+    ' 2. Liczenie surowców > 0
+    For col = colStart To colEnd
+        procent = 0
+        If IsNumeric(wsProd.Cells(currentRow, col).Value) Then
+            procent = CDbl(wsProd.Cells(currentRow, col).Value)
+        End If
+        If procent > 0 Then n = n + 1
+    Next col
+    
+    If n = 0 Then
+        MsgBox "Brak surowców o zawartości większej od zera.", vbInformation
+        Exit Sub
+    End If
+    
+    ReDim arrSurowce(1 To n, 1 To 3)
+    
+    ' 3. Pobranie danych
+    i = 0
+    For col = colStart To colEnd
+        
+        nazwa = CStr(wsProd.Cells(2, col).Value)
+        
+        procent = 0
+        If IsNumeric(wsProd.Cells(currentRow, col).Value) Then
+            procent = CDbl(wsProd.Cells(currentRow, col).Value)
+        End If
+        
+        If procent > 0 Then
+            i = i + 1
+            arrSurowce(i, 1) = nazwa
+            arrSurowce(i, 2) = procent
+            
+            ' -----------------------------------------
+            '      NOWA ZASADA: jeśli zawiera "owoc"
+            ' -----------------------------------------
+            If InStr(1, nazwa, "owoc", vbTextCompare) > 0 Then
+                kraj = "Polska"
+            
+            ' -----------------------------------------
+            '   Poprzednia zasada: owoce › kolumna CT
+            '   (ale tylko jeśli nazwa NIE zawiera "owoc")
+            ' -----------------------------------------
+            ElseIf InStr(1, nazwa, "owoce", vbTextCompare) > 0 Then
+                kraj = CStr(wsProd.Cells(currentRow, colCT).Value)
+            
+            Else
+                'Pozostałe surowce – standardowe dopasowanie
+                kraj = ""
+                nm = LCase$(Trim$(nazwa))
+                
+                For Each colHeader In headerRngKraje
+                    hdr = LCase$(Trim$(CStr(colHeader.Value)))
+                    
+                    If hdr <> "" Then
+                        If StrComp(hdr, nm, vbTextCompare) = 0 _
+                        Or InStr(nm, hdr) > 0 _
+                        Or InStr(hdr, nm) > 0 Then
+                            
+                            kraj = CStr(wsProd.Cells(currentRow, colHeader.Column).Value)
+                            Exit For
+                        End If
+                    End If
+                Next colHeader
+            End If
+            
+            arrSurowce(i, 3) = kraj
+        End If
+    Next col
+    
+    ' 4. Sortowanie malejąco po procentach
+    Do
+        swapped = False
+        For i = 1 To n - 1
+            If CDbl(arrSurowce(i, 2)) < CDbl(arrSurowce(i + 1, 2)) Then
+                
+                tmp1 = arrSurowce(i, 1)
+                tmp2 = arrSurowce(i, 2)
+                tmp3 = arrSurowce(i, 3)
+                
+                arrSurowce(i, 1) = arrSurowce(i + 1, 1)
+                arrSurowce(i, 2) = arrSurowce(i + 1, 2)
+                arrSurowce(i, 3) = arrSurowce(i + 1, 3)
+                
+                arrSurowce(i + 1, 1) = tmp1
+                arrSurowce(i + 1, 2) = tmp2
+                arrSurowce(i + 1, 3) = tmp3
+                
+                swapped = True
+            End If
+        Next i
+    Loop While swapped
+    
+    ' 5. Wpisywanie danych
+    maxRows = 192 - 178 + 1
+    
+    ClearRangeRespectMerges wsKarta.Range("A178:A192")
+    ClearRangeRespectMerges wsKarta.Range("E178:E192")
+    ClearRangeRespectMerges wsKarta.Range("G178:G192")
+    
+    outRows = Application.WorksheetFunction.Min(n, maxRows)
+    
+    For i = 1 To outRows
+        
+        wsKarta.Cells(178 + i - 1, "A").Value = arrSurowce(i, 1)
+        
+        Dim v As Double
+        Dim rngPct As Range
+        
+        v = CDbl(arrSurowce(i, 2)) / 100
+        
+        Set rngPct = wsKarta.Cells(178 + i - 1, "E")
+        With rngPct.MergeArea
+            .Value = v
+            .NumberFormatLocal = "0,000%"   ' <<< 3 miejsca po przecinku
+        End With
+        
+        wsKarta.Cells(178 + i - 1, "G").Value = arrSurowce(i, 3)
+    
+    Next i
+    
+End Sub
+
+
+Option Explicit
+
+' Funkcja: zwraca unikatową listę krajów na podstawie:
+' - wiersza z wartościami (np. D3:W3)
+' - wiersza z nazwami (nagłówki, np. D2:W2)
+' - zakresu z nazwami surowców (np. Surowce!B3:B14)
+' - zakresu z krajami (np. Surowce!AV3:AV14)
+Public Function ListaKrajow( _
+    ByVal valuesRow As Range, _
+    ByVal headersRow As Range, _
+    ByVal lookupNames As Range, _
+    ByVal countries As Range) As String
+    
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary")
+    
+    Dim i As Long
+    Dim val As Variant
+    Dim nameVal As String
+    Dim countryList As String
+    Dim parts() As String
+    Dim p As Variant
+    Dim cleaned As String
+    Dim result As String
+    
+    ' przejście po wierszu wartości (D3:W3)
+    For i = 1 To valuesRow.Columns.Count
+        val = valuesRow.Cells(1, i).Value
+        
+        ' odpowiada warunkowi: D3:W3>0
+        If IsNumeric(val) Then
+            If val > 0 Then
+                ' odpowiada: _names = FILTRUJ(D$2:W$2; _mask)
+                nameVal = CStr(headersRow.Cells(1, i).Value)
+                
+                ' odpowiada: X.WYSZUKAJ(_names; Surowce!$B$3:$B$14; Surowce!$AV$3:$AV$14)
+                On Error Resume Next
+                countryList = ""
+                countryList = Application.WorksheetFunction.Index( _
+                                countries, _
+                                Application.WorksheetFunction.Match(nameVal, lookupNames, 0))
+                On Error GoTo 0
+                
+                If Len(countryList) > 0 Then
+                    ' odpowiada: PODZIEL.TEKST(POŁĄCZ.TEKSTY(", ";PRAWDA; _kraje); ",")
+                    parts = Split(countryList, ",")
+                    
+                    For Each p In parts
+                        ' odpowiada: USUŃ.ZBĘDNE.ODSTĘPY(OCZYŚĆ(PODSTAW(...; ZNAK(160); " ")))
+                        cleaned = CStr(p)
+                        cleaned = Replace(cleaned, Chr(160), " ")
+                        cleaned = Application.WorksheetFunction.Clean(cleaned)
+                        cleaned = Application.WorksheetFunction.Trim(cleaned)
+                        
+                        ' odpowiada filtrowaniu: (_norm<>"")*(_norm<>"0")
+                        If cleaned <> "" And cleaned <> "0" Then
+                            ' UNIKATOWE – używamy słownika
+                            If Not dict.Exists(cleaned) Then
+                                dict.Add cleaned, True
+                            End If
+                        End If
+                    Next p
+                End If
+            End If
+        End If
+    Next i
+    
+    ' odpowiada: POŁĄCZ.TEKSTY(", "; PRAWDA; UNIKATOWE(_czyste))
+    If dict.Count > 0 Then
+        result = Join(dict.Keys, ", ")
+    Else
+        result = ""
+    End If
+    
+    ListaKrajow = result
+End Function
+
+
+Sub kraje()
+
+End Sub
+
+
+Sub UsunDuplikatyTekstu()
+    Dim kom As Range
+    Dim Lista As Variant
+    Dim wynik As String
+    Dim dict As Object
+    Dim elem As Variant
+    
+    On Error Resume Next
+    Set kom = Selection
+    If kom Is Nothing Then Exit Sub
+    
+    Lista = Split(kom.Value, ",")
+    Set dict = CreateObject("Scripting.Dictionary")
+    
+    For Each elem In Lista
+        elem = Trim(elem)
+        If Len(elem) > 0 Then
+            If Not dict.Exists(elem) Then dict.Add elem, 1
+        End If
+    Next elem
+    
+    wynik = Join(dict.Keys, ", ")
+    kom.Value = wynik
+End Sub
+
+Public Function JoinSortedIngredientsAdv(Headers As Range, Values As Range, _
+                                         Optional Separator As String = ", ", _
+                                         Optional MinValue As Double = 0) As String
+    Dim n As Long, i As Long, j As Long
+    Dim arrH As Variant, arrV As Variant
+    Dim idx() As Long
+    Dim isRowH As Boolean, isRowV As Boolean
+    Dim v As Variant, vj As Variant, h As String
+
+    ' kolekcje
+    Dim listMainTxt As Collection, listMainVal As Collection
+    Dim listEmul As Collection, listAroma As Collection
+    Dim listFruits As Collection, listColors As Collection
+    Dim out As String
+
+    On Error GoTo SafeExit
+
+    If Headers.Count <> Values.Count Then
+        JoinSortedIngredientsAdv = "#ERR: różna liczba komórek": Exit Function
+    End If
+
+    arrH = Headers.Value2
+    arrV = Values.Value2
+
+    isRowH = (UBound(arrH, 1) = 1)
+    isRowV = (UBound(arrV, 1) = 1)
+    If isRowH Then n = UBound(arrH, 2) Else n = UBound(arrH, 1)
+
+    ReDim idx(1 To n)
+    For i = 1 To n: idx(i) = i: Next i
+
+    ' --- sortowanie malejąco wg wartości ---
+    For i = 2 To n
+        j = i
+        Do While j > 1
+            v = GetVal(arrV, isRowV, idx(j))
+            vj = GetVal(arrV, isRowV, idx(j - 1))
+            If Not IsNumeric(v) Then v = -1E+99
+            If Not IsNumeric(vj) Then vj = -1E+99
+            If CDbl(v) > CDbl(vj) Then
+                SwapLong idx(j), idx(j - 1)
+                j = j - 1
+            Else
+                Exit Do
+            End If
+        Loop
+    Next i
+
+    Set listMainTxt = New Collection
+    Set listMainVal = New Collection
+    Set listEmul = New Collection
+    Set listAroma = New Collection
+    Set listFruits = New Collection
+    Set listColors = New Collection
+
+    ' --- flaga dla "owoce liofilizowane" ---
+    Dim hasFDMarker As Boolean
+    hasFDMarker = HasFreezeDriedMarker(arrH, isRowH)
+
+    ' --- rozdzielanie składników ---
+    For i = 1 To n
+        v = GetVal(arrV, isRowV, idx(i))
+        h = TrimSpaces(CStr(GetVal(arrH, isRowH, idx(i))))
+        If Len(h) = 0 Then GoTo NextI
+
+        ' aromat
+        If IsAroma(h) Then
+            If IsNumeric(v) And CDbl(v) > MinValue Then listAroma.Add h
+            GoTo NextI
+        End If
+
+        ' owoce liofilizowane: "owoce liofilizowane: malina"
+        If IsFreezeDried(h) Then
+            Dim fr As String
+            fr = LCase$(StripFreezeDriedPrefix(h))
+            If Len(fr) > 0 Then
+                If IsNumeric(v) And CDbl(v) > MinValue Then
+                    listFruits.Add FormatE(fr) & " " & FormatPct(CDbl(v))
+                End If
+                GoTo NextI
+            End If
+        End If
+
+        ' owoce liofilizowane: marker + osobne owoce
+        If hasFDMarker And IsFruitName(h) Then
+            If IsNumeric(v) And CDbl(v) > MinValue Then
+                listFruits.Add FormatE(LCase$(h)) & " " & FormatPct(CDbl(v))
+            End If
+            GoTo NextI
+        End If
+
+        ' barwniki
+        If IsColorant(h) Then
+            If IsNumeric(v) And CDbl(v) > MinValue Then listColors.Add FormatE(StripColorantPrefix(h))
+            GoTo NextI
+        End If
+
+        ' emulgatory
+        If IsEmulsifier(h) Then
+            If IsNumeric(v) And CDbl(v) > MinValue Then listEmul.Add FormatE(StripEmulsifierPrefix(h))
+            GoTo NextI
+        End If
+
+        ' składniki główne
+        If IsNumeric(v) And CDbl(v) > MinValue Then
+            listMainTxt.Add h
+            listMainVal.Add CDbl(v)
+        End If
+NextI:
+    Next i
+
+    ' === budowanie i sortowanie bloków wg % ===
+    Dim blockTxt As Collection, blockVal As Collection
+    Set blockTxt = New Collection
+    Set blockVal = New Collection
+
+    ' główne składniki jako bloki
+    Dim k As Long
+    For k = 1 To listMainTxt.Count
+        blockTxt.Add CStr(listMainTxt(k))
+        blockVal.Add CDbl(listMainVal(k))
+    Next k
+
+    ' owoce liofilizowane jako blok (suma %)
+    Dim fruitTotal As Double, frTxt As String
+    fruitTotal = 0
+    If listFruits.Count > 0 Then
+        For k = 1 To listFruits.Count
+            Dim t As String, p As Long, numTxt As String, num As Double
+            t = CStr(listFruits(k))                ' np. "malina 5%"
+            p = InStrRev(t, " ")
+            If p > 0 Then
+                numTxt = Replace(Replace(Mid$(t, p + 1), "%", ""), " ", "")
+                numTxt = Replace(numTxt, ",", Application.DecimalSeparator)
+                numTxt = Replace(numTxt, ".", Application.DecimalSeparator)
+                On Error Resume Next
+                num = CDbl(numTxt)
+                On Error GoTo 0
+                fruitTotal = fruitTotal + num
+            End If
+        Next k
+        frTxt = "owoce liofilizowane: " & JoinCollection(listFruits, ", ")
+        If listFruits.Count > 1 Then frTxt = frTxt & ";"   ' ? średnik po wielu owocach
+        blockTxt.Add frTxt
+        blockVal.Add fruitTotal
+    End If
+
+    ' sort bloków wg % malejąco
+    Dim order() As Long, m As Long, nBlocks As Long
+    nBlocks = blockTxt.Count
+    ReDim order(1 To nBlocks)
+    For k = 1 To nBlocks: order(k) = k: Next k
+
+    For k = 2 To nBlocks
+        m = k
+        Do While m > 1
+            If CDbl(blockVal(order(m))) > CDbl(blockVal(order(m - 1))) Then
+                SwapLong order(m), order(m - 1)
+                m = m - 1
+            Else
+                Exit Do
+            End If
+        Loop
+    Next k
+
+    ' zbuduj część główną (po sortowaniu)
+    out = ""
+    For k = 1 To nBlocks
+        If Len(out) > 0 Then out = out & Separator
+        out = out & CStr(blockTxt(order(k)))
+    Next k
+
+    ' ================= dopięcie grup nieprocentowych =================
+    ' BARWNIKI: zawsze "barwniki:", średnik gdy >=2
+    If listColors.Count > 0 Then
+        Dim colTxt As String
+        colTxt = "barwniki: " & JoinCollection(listColors, ", ")
+        If Len(out) > 0 And Right$(out, 2) <> "; " Then out = out & Separator
+        out = out & colTxt
+        If listColors.Count > 1 Then out = out & "; "
+    End If
+
+    ' EMULGATORY: średnik gdy >2
+    If listEmul.Count > 0 Then
+        Dim emuTxt As String
+        emuTxt = IIf(listEmul.Count = 1, "emulgator: ", "emulgatory: ")
+        emuTxt = emuTxt & JoinCollection(listEmul, ", ")
+        If Len(out) > 0 And Right$(out, 2) <> "; " Then out = out & Separator
+        out = out & emuTxt
+        If listEmul.Count > 2 Then out = out & "; "
+    End If
+
+    ' AROMAT – na końcu
+    If listAroma.Count > 0 Then
+        Dim aromTxt As String, sepBefore As String
+        aromTxt = JoinCollection(listAroma, ", ")
+        sepBefore = IIf(Len(out) > 0 And Right$(out, 2) <> "; ", Separator, "")
+        out = out & sepBefore & aromTxt
+    End If
+
+    ' --- sprzątanie interpunkcji ---
+    out = Replace(out, "; ,", "; ")
+    out = Replace(out, ";, ", "; ")
+    out = Replace(out, ";,", ";")
+    out = Replace(out, ", ;", ";")
+    out = Replace(out, "  ", " ")
+    out = Replace(out, " barwniki: i:", " barwniki: ")
+    out = Replace(out, " i: ", " ")
+    out = Replace(out, " i:", " ")
+
+    JoinSortedIngredientsAdv = out
+    Exit Function
+
+SafeExit:
+    If Len(JoinSortedIngredientsAdv) = 0 Then JoinSortedIngredientsAdv = out
+End Function
+
+'=============================================
+' HELPERY (MUSZĄ BYĆ W STANDARD MODULE)
+'=============================================
+Private Function GetVal(A As Variant, isRow As Boolean, k As Long) As Variant
+    If isRow Then GetVal = A(1, k) Else GetVal = A(k, 1)
+End Function
+
+Private Sub SwapLong(ByRef A As Long, ByRef B As Long)
+    Dim t As Long: t = A: A = B: B = t
+End Sub
+
+Private Function TrimSpaces(ByVal txt As String) As String
+    Dim t As String
+    t = Replace(txt, Chr(160), " ")
+    t = Application.WorksheetFunction.Trim(t)
+    Do While InStr(t, "  ") > 0
+        t = Replace(t, "  ", " ")
+    Loop
+    TrimSpaces = t
+End Function
+
+Private Function JoinCollection(col As Collection, sep As String) As String
+    Dim s As String, i As Long
+    For i = 1 To col.Count
+        If Len(s) > 0 Then s = s & sep
+        s = s & CStr(col(i))
+    Next i
+    JoinCollection = s
+End Function
+
+' --- rozpoznawanie słów/zwrotów ---
+Private Function IsAroma(txt As String) As Boolean
+    IsAroma = (InStr(1, LCase$(TrimSpaces(txt)), "aromat", vbTextCompare) > 0)
+End Function
+
+Private Function IsEmulsifier(txt As String) As Boolean
+    IsEmulsifier = (InStr(1, LCase$(TrimSpaces(txt)), "emulgator", vbTextCompare) > 0)
+End Function
+
+Private Function IsColorant(txt As String) As Boolean
+    IsColorant = (InStr(1, LCase$(TrimSpaces(txt)), "barwnik", vbTextCompare) > 0)
+End Function
+
+Private Function IsFreezeDried(txt As String) As Boolean
+    IsFreezeDried = (InStr(1, LCase$(TrimSpaces(txt)), "owoce liofilizowane", vbTextCompare) > 0)
+End Function
+
+Private Function HasFreezeDriedMarker(ByVal arrH As Variant, ByVal isRowH As Boolean) As Boolean
+    Dim n As Long, i As Long, h As String
+    If isRowH Then n = UBound(arrH, 2) Else n = UBound(arrH, 1)
+    For i = 1 To n
+        If isRowH Then h = CStr(arrH(1, i)) Else h = CStr(arrH(i, 1))
+        h = LCase$(TrimSpaces(h))
+        If InStr(1, h, "owoce liofilizowane", vbTextCompare) > 0 Then
+            HasFreezeDriedMarker = True: Exit Function
+        End If
+    Next i
+    HasFreezeDriedMarker = False
+End Function
+
+' Prosty słownik nazw owoców
+Private Function IsFruitName(ByVal txt As String) As Boolean
+    Dim s As String, fruits As Variant, i As Long
+    s = LCase$(TrimSpaces(txt))
+    fruits = Array("malina", "truskawka", "porzeczka", "jabłko", "jablko", "wiśnia", "wisnia", _
+                   "śliwka", "sliwka", "brzoskwinia", "borówka", "borowka", "jagoda", _
+                   "żurawina", "zurawina", "jeżyna", "jezyna", "gruszka", "mango", "banan", _
+                   "cytryna", "pomarańcza", "pomarancza", "marakuja", "aronia", "agrest", "kiwi")
+    For i = LBound(fruits) To UBound(fruits)
+        If s = fruits(i) Then IsFruitName = True: Exit Function
+    Next i
+    IsFruitName = False
+End Function
+
+Private Function StripFreezeDriedPrefix(ByVal txt As String) As String
+    Dim t As String
+    t = TrimSpaces(Replace(LCase$(txt), "owoce liofilizowane", ""))
+    If Left$(t, 1) = ":" Or Left$(t, 1) = "," Then t = Mid$(t, 2)
+    StripFreezeDriedPrefix = TrimSpaces(t)
+End Function
+
+Private Function StripColorantPrefix(ByVal txt As String) As String
+    Dim t As String
+    t = TrimSpaces(Replace(LCase$(txt), "barwnik", ""))
+    If Left$(t, 1) = ":" Or Left$(t, 1) = "," Then t = Mid$(t, 2)
+    StripColorantPrefix = TrimSpaces(t)
+End Function
+
+Private Function StripEmulsifierPrefix(ByVal txt As String) As String
+    Dim t As String
+    t = TrimSpaces(Replace(LCase$(txt), "emulgator", ""))
+    If Left$(t, 1) = ":" Or Left$(t, 1) = "," Then t = Mid$(t, 2)
+    StripEmulsifierPrefix = TrimSpaces(t)
+End Function
+
+' --- normalizacja E-numerów i % ---
+Private Function FormatE(ByVal txt As String) As String
+    Dim re As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Global = True: re.IgnoreCase = True
+    re.Pattern = "\b[eE]\s*(\d{3,4})([a-zA-Z]?)\b"
+    FormatE = re.Replace(txt, "E $1$2")
+End Function
+
+Private Function FormatPct(ByVal v As Variant) As String
+    Dim d As Double, s As String, ds As String
+    If IsNumeric(v) Then d = CDbl(v) Else d = 0
+    ds = Application.DecimalSeparator
+    s = CStr(Round(d, 3))
+    If Right$(s, 1) = "," Or Right$(s, 1) = "." Then s = Left$(s, Len(s) - 1)
+    s = Replace(Replace(s, ".", ds), ",", ds)
+    FormatPct = s & "%"
+End Function
+
+
+
+Option Explicit
+
+' ============================
+' Makro: Pogrubianie wyrazów w kolumnie obok
+' ============================
+Sub PogrubWyrazyObok()
+    Dim rng As Range, kom As Range
+    Dim slowa As Variant, i As Long, pos As Long
+    Dim slowo As String
+    Dim tekst As String
+
+    ' ?? ZAKRES DO FORMATOWANIA
+    ' tu wpisz zakres, w którym znajdują się generowane składy:
+    Set rng = Range("BW3:BW100")   ' <-- dostosuj do swojego arkusza!
+
+    ' ?? Lista słów do pogrubienia (małe litery)
+    slowa = Array("mleko", "mleka", "mleczny", "soi")
+
+    Application.ScreenUpdating = False
+    For Each kom In rng
+        If Not IsEmpty(kom.Value) Then
+            tekst = kom.Value
+            kom.Font.Bold = False
+
+            ' Szukamy i pogrubiamy każde słowo
+            For i = LBound(slowa) To UBound(slowa)
+                pos = InStr(1, LCase(tekst), LCase(slowa(i)), vbTextCompare)
+                Do While pos > 0
+                    kom.Characters(Start:=pos, Length:=Len(slowa(i))).Font.Bold = True
+                    pos = InStr(pos + Len(slowa(i)), LCase(tekst), LCase(slowa(i)), vbTextCompare)
+                Loop
+            Next i
+        End If
+    Next kom
+    Application.ScreenUpdating = True
+
+    MsgBox "Gotowe! Wyrazy zostały pogrubione w zakresie " & rng.Address, vbInformation
+End Sub
+
+
+
+Option Explicit
+
+' Skopiuj WARTOŚĆ z BV do BW i pogrub wybrane słowa w BW
+Sub KopiujBVdoBW_iPogrub()
+    Dim src As Range, rng As Range, dst As Range
+    Dim slowa As Variant
+    Dim ws As Worksheet
+    
+    
+    slowa = Array("mleko", "mleka", "mleczny", "soi")   ' <- lista do pogrubienia
+    
+     ' Arkusz, na którym działa makro:
+    Set ws = ThisWorkbook.Worksheets("Produkty")
+
+    ' ZAKRES ŹRÓDŁOWY z gotowymi składami w BV:
+    Set rng = ws.Range("CN3:CN1000")                        ' <- dostosuj
+
+    Application.ScreenUpdating = False
+    For Each src In rng
+        Set dst = src.Offset(0, 1)   ' kolumna BW
+        If Len(src.Value) > 0 Then
+            dst.NumberFormat = "@"
+            dst.Value = CStr(src.Value)                 ' wstaw WARTOŚĆ (bez formuły)
+            ClearBoldInCell dst
+            BoldWordsInCell dst, slowa
+        Else
+            dst.ClearContents
+        End If
+    Next src
+    Application.ScreenUpdating = True
+
+End Sub
+
+' ===== helpery formatowania =====
+Private Sub ClearBoldInCell(ByVal kom As Range)
+    Dim L As Long, t As String
+    t = CStr(kom.Value): L = Len(t)
+    If L > 0 Then kom.Characters(1, L).Font.Bold = False Else kom.Font.Bold = False
+End Sub
+
+Private Sub BoldWordsInCell(ByVal kom As Range, ByVal words As Variant)
+    Dim t As String, tLC As String, w As String, wLC As String
+    Dim p As Long, i As Long
+    t = CStr(kom.Value): If Len(t) = 0 Then Exit Sub
+    tLC = LCase$(t)
+    For i = LBound(words) To UBound(words)
+        w = CStr(words(i)): If Len(w) = 0 Then GoTo NextI
+        wLC = LCase$(w): p = 1
+        Do
+            p = InStr(p, tLC, wLC, vbBinaryCompare)
+            If p = 0 Then Exit Do
+            kom.Characters(p, Len(w)).Font.Bold = True
+            p = p + Len(w)
+        Loop
+NextI:
+    Next i
+End Sub
+
+Private Sub Worksheet_Calculate()
+    On Error GoTo Done
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+    KopiujBVdoBW_iPogrub   ' uruchamia główne makro z Module1
+Done:
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+End Sub
+
+
+Option Explicit
+
+' ===================== KONFIGURACJA ==========================
+Private Const SHEET_TARGET As String = "Karta produktu"
+Private Const SHEET_DATA1 As String = "Baza_produktów"
+Private Const SHEET_DATA2 As String = "Produkty"
+Private Const SHEET_MAP As String = "Mapowanie"
+Private Const MAP_FIRST_ROW As Long = 2
+
+Private Const CELL_NAME As String = "B5"
+Private Const CELL_MASS As String = "B6"
+
+' Ścieżka SharePoint/OneDrive – działa u każdego
+Private Const SHAREPOINT_FOLDER As String = "\Adikam Sp. z o.o\JAKOŚĆ - KARTY_PRODUKTÓW"
+' =============================================================
+
+
+
+' =============================================================
+'                 GŁÓWNE WEJŚCIE DLA UŻYTKOWNIKA
+' =============================================================
+Public Sub WypelnijKarte_AktywnyWiersz()
+
+    If ActiveSheet.Name <> SHEET_DATA1 Then
+        MsgBox "Wejdź na arkusz '" & SHEET_DATA1 & "' i zaznacz wiersz produktu.", vbExclamation
+        Exit Sub
+    End If
+
+    WypelnijKarte_ZWiersza ActiveCell.Row
+
+End Sub
+
+
+
+' =============================================================
+'               GŁÓWNY SILNIK – PRZEPISANIE + ZAPIS
+' =============================================================
+Public Sub WypelnijKarte_ZWiersza(ByVal dataRow As Long)
+
+    Dim wsT As Worksheet, wsD1 As Worksheet, wsD2 As Worksheet, wsM As Worksheet
+    Dim LastRow As Long, i As Long
+    Dim src1 As String, src2 As String, dst As String, v As Variant
+
+    Set wsT = Worksheets(SHEET_TARGET)
+    Set wsD1 = Worksheets(SHEET_DATA1)
+    Set wsD2 = Worksheets(SHEET_DATA2)
+    Set wsM = Worksheets(SHEET_MAP)
+
+    LastRow = wsM.Cells(wsM.Rows.Count, "D").End(xlUp).Row
+
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    Call KopiujBVdoBW_iPogrub
+    Call AnalizaAlergenow
+
+    ' ---- PRZEPISYWANIE DANYCH ----
+    For i = MAP_FIRST_ROW To LastRow
+
+        src1 = Trim(CStr(wsM.Cells(i, "B").Value))
+        src2 = Trim(CStr(wsM.Cells(i, "C").Value))
+        dst = Trim(CStr(wsM.Cells(i, "D").Value))
+
+        If Len(dst) > 0 Then
+
+            If Len(src1) > 0 Then
+                v = ResolveSource(src1, wsD1, dataRow)
+
+            ElseIf Len(src2) > 0 Then
+                v = ResolveSource(src2, wsD2, dataRow)
+
+            Else
+                v = Empty
+            End If
+
+            If VarType(v) <> vbError Then
+                wsT.Range(dst).Value = v
+            End If
+
+        End If
+
+    Next i
+
+    ' Kopiowanie zdjęcia
+    KopiujObrazek_Do_Karty
+
+    ' Jeżeli masz takie funkcje, zostaną wykonane:
+    On Error Resume Next
+    GenerujTabeleSurowcow
+    PrzepiszAlergeny
+    On Error GoTo 0
+
+    ' ======= ZAPIS PLIKU =======
+    Dim productID As String, prodName As String, masa As String
+    Dim creationDate As String, savePath As String, fileName As String
+
+    productID = wsD1.Cells(dataRow, 1).Value
+    prodName = wsD1.Cells(dataRow, 2).Value
+    masa = wsT.Range(CELL_MASS).Value
+    creationDate = Format(Date, "yyyy-MM-dd")
+
+    fileName = creationDate & " - " & productID & " - " & prodName & ".xlsx"
+    fileName = SafeFileName(fileName)
+
+    savePath = GetSharePointPath() & "\" & fileName
+
+    SaveSheetAsXlsx wsT, savePath
+
+
+    Application.ScreenUpdating = True
+    Application.Calculation = xlCalculationAutomatic
+
+    MsgBox "Karta zapisana jako: " & vbCrLf & savePath, vbInformation
+
+End Sub
+
+
+
+' =============================================================
+'                RESOLVE SOURCE – mapowanie danych
+' =============================================================
+Private Function ResolveSource(ByVal expr As String, _
+                               ByVal wsSrc As Worksheet, _
+                               ByVal dataRow As Long) As Variant
+
+    Dim adr As String
+
+    If Len(expr) = 0 Then
+        ResolveSource = Empty
+        Exit Function
+    End If
+
+    If Left(expr, 5) = "TEXT:" Then
+        ResolveSource = Mid(expr, 6)
+        Exit Function
+    End If
+
+    If InStr(expr, "{{ROW}}") > 0 Then expr = Replace(expr, "{{ROW}}", "{ROW}")
+
+    If InStr(expr, "{ROW}") > 0 Then
+        adr = Replace(expr, "{ROW}", CStr(dataRow))
+        ResolveSource = SafeGet(wsSrc, adr)
+        Exit Function
+    End If
+
+    ResolveSource = SafeGet(wsSrc, expr)
+
+End Function
+
+
+
+' =============================================================
+'                    Pobieranie komórek
+' =============================================================
+Private Function SafeGet(ByVal ws As Worksheet, ByVal adr As String) As Variant
+    Dim rng As Range
+    On Error Resume Next
+    Set rng = ws.Range(adr)
+    On Error GoTo 0
+
+    If rng Is Nothing Then
+        SafeGet = CVErr(xlErrRef)
+    Else
+        SafeGet = rng.Value
+    End If
+End Function
+
+
+
+' =============================================================
+'                  ZAPIS DO SHAREPOINT/ONEDRIVE
+' =============================================================
+Private Function GetSharePointPath() As String
+
+    Dim p As String
+    p = Environ("UserProfile") & SHAREPOINT_FOLDER
+
+    If Dir(p, vbDirectory) = vbNullString Then
+        MsgBox "Folder SharePoint NIE jest zsynchronizowany:" & vbCrLf & p, vbCritical
+        GetSharePointPath = CurDir$
+    Else
+        GetSharePointPath = p
+    End If
+
+End Function
+
+
+
+Private Function SafeFileName(ByVal s As String) As String
+    Dim bad, i
+    bad = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+
+    For i = 0 To UBound(bad)
+        s = Replace(s, bad(i), "_")
+    Next i
+
+    SafeFileName = s
+End Function
+
+
+
+Private Sub SaveSheetAsXlsx(ByVal sh As Worksheet, ByVal fullPath As String)
+    Dim tmp As Workbook
+    Application.DisplayAlerts = False
+    sh.Copy
+    Set tmp = ActiveWorkbook
+    tmp.SaveAs fileName:=fullPath, FileFormat:=xlOpenXMLWorkbook
+    tmp.Close False
+    Application.DisplayAlerts = True
+End Sub
+
+
+
+' =============================================================
+'              KOPIOWANIE OBRAZKA Z BAZA_PRODUKTÓW
+' =============================================================
+Private Sub KopiujObrazek_Do_Karty()
+
+    Dim wsSrc As Worksheet, wsDst As Worksheet
+    Dim currentRow As Long
+
+    Set wsSrc = Worksheets("Baza_produktów")
+    Set wsDst = Worksheets("Karta produktu")
+
+    currentRow = ActiveCell.Row
+
+    wsSrc.Range("C" & currentRow).Copy
+    wsDst.Range("A38").PasteSpecial xlPasteAll
+
+    Application.CutCopyMode = False
+
+End Sub
+
+Sub PrzepiszAlergeny()
+
+    Const FIRST_TARGET_ROW As Long = 196   'pierwszy wiersz alergenów na "Karcie produktu"
+    Const ALLERGEN_COUNT As Long = 14      'liczba alergenów
+
+    Const TRIGGER_SHEET As String = "Baza_produktów" 'tu uruchamiamy makro
+    Const SRC_SHEET As String = "Produkty"           'stąd bierzemy alergeny
+    Const DEST_SHEET As String = "Karta produktu"    'tu trafiają checkboxy
+
+    Const DEBUG_FIRST As Boolean = False   '‹ ustaw na True, jeżeli chcesz zobaczyć okno debug dla 1. alergenu
+
+    Dim wsTrig As Worksheet
+    Dim wsSrc As Worksheet
+    Dim wsDest As Worksheet
+
+    Dim currentRow As Long
+    Dim startCol As Long
+    Dim i As Long
+    Dim allergenValues(1 To ALLERGEN_COUNT) As String
+    Dim cleaned As String
+    Dim targetRow As Long
+
+    '1. Sprawdzenie, czy startujemy z Baza_produktów
+    Set wsTrig = ThisWorkbook.Worksheets(TRIGGER_SHEET)
+    If Not ActiveSheet Is wsTrig Then
+        MsgBox "Makro uruchamiaj z arkusza '" & TRIGGER_SHEET & "'.", vbExclamation
+        Exit Sub
+    End If
+
+    currentRow = ActiveCell.Row
+
+    '2. Ustawienie arkuszy: źródłowy i docelowy
+    Set wsSrc = ThisWorkbook.Worksheets(SRC_SHEET)
+    Set wsDest = ThisWorkbook.Worksheets(DEST_SHEET)
+
+    'kolumna CU (pierwszy alergen) na arkuszu Produkty
+    startCol = wsSrc.Range("DW1").Column
+
+    '3. Odczyt wartości alergenów z arkusza Produkty (CU–DH)
+    For i = 1 To ALLERGEN_COUNT
+        allergenValues(i) = wsSrc.Cells(currentRow, startCol + i - 1).Value
+    Next i
+
+    '4. Uzupełnienie checkboxów (TRUE/FALSE w komórkach powiązanych)
+    For i = 1 To ALLERGEN_COUNT
+
+        targetRow = FIRST_TARGET_ROW + (i - 1)
+        cleaned = LCase(Trim(allergenValues(i)))   'małe litery + obcięcie spacji
+
+        'najpierw odznacz wszystko w danym wierszu
+        With wsDest
+            .Cells(targetRow, "E").Value = False   'NIE ZAWIERA
+            .Cells(targetRow, "G").Value = False   'MOŻE ZAWIERAĆ
+            .Cells(targetRow, "I").Value = False   'ZAWIERA
+        End With
+
+        'logika wyboru
+        Select Case cleaned
+            Case "nie zawiera"
+                wsDest.Cells(targetRow, "E").Value = True
+            Case "może zawierać", "moze zawierac"
+                wsDest.Cells(targetRow, "G").Value = True
+            Case "zawiera"
+                wsDest.Cells(targetRow, "I").Value = True
+            'inne wartości -> wszystkie trzy pozostają False
+        End Select
+
+        'opcjonalny DEBUG – tylko dla pierwszego alergenu
+        If DEBUG_FIRST And i = 1 Then
+            MsgBox "DEBUG – pierwszy alergen:" & vbCrLf & _
+                   "Arkusz wywołujący: " & wsTrig.Name & vbCrLf & _
+                   "Wiersz: " & currentRow & vbCrLf & vbCrLf & _
+                   "Arkusz źródłowy: " & wsSrc.Name & vbCrLf & _
+                   "Kolumna: " & wsSrc.Cells(1, startCol + i - 1).Address(False, False) & vbCrLf & _
+                   "Wartość tekstowa: " & allergenValues(i) & vbCrLf & vbCrLf & _
+                   "Arkusz docelowy: " & wsDest.Name & vbCrLf & _
+                   "Wiersz docelowy: " & targetRow & vbCrLf & _
+                   "E" & targetRow & " (Nie zawiera) = " & wsDest.Cells(targetRow, "E").Value & vbCrLf & _
+                   "G" & targetRow & " (Może zawierać) = " & wsDest.Cells(targetRow, "G").Value & vbCrLf & _
+                   "I" & targetRow & " (Zawiera) = " & wsDest.Cells(targetRow, "I").Value
+        End If
+
+    Next i
+
+
+End Sub
+
+
+Option Explicit
+
+'==== Pomocnicza procedura – czyści zakres, uwzględniając komórki scalone ====
+Private Sub ClearRangeRespectMerges(rng As Range)
+    Dim c As Range
+    For Each c In rng
+        If c.MergeCells Then
+            If c.Address = c.MergeArea.Cells(1, 1).Address Then
+                c.MergeArea.ClearContents
+            End If
+        Else
+            c.ClearContents
+        End If
+    Next c
+End Sub
+
+'==== Główne makro ====
+Sub GenerujTabeleSurowcow()
+    Dim wsProd As Worksheet
+    Dim wsKarta As Worksheet
+    Dim currentRow As Long
+    Dim i As Long, col As Long
+    Dim colStart As Long, colEnd As Long
+    Dim n As Long
+    Dim arrSurowce() As Variant
+    Dim nazwa As String
+    Dim procent As Double
+    Dim kraj As String
+    Dim colCT As Long
+    Dim colHeader As Range
+    Dim headerRngKraje As Range
+    Dim maxRows As Long
+    Dim outRows As Long
+    Dim swapped As Boolean
+    Dim tmp1 As Variant, tmp2 As Variant, tmp3 As Variant
+    Dim hdr As String, nm As String
+    
+    Set wsProd = ThisWorkbook.Worksheets("Produkty")
+    Set wsKarta = ThisWorkbook.Worksheets("Karta produktu")
+    
+    currentRow = ActiveCell.Row
+    
+    
+    colStart = wsProd.Range("BB2").Column
+    colEnd = wsProd.Range("CD2").Column
+    
+    Set headerRngKraje = wsProd.Range("CP2:DL2")
+    colCT = wsProd.Range("DL2").Column
+    
+    ' 2. Liczenie surowców > 0
+    For col = colStart To colEnd
+        procent = 0
+        If IsNumeric(wsProd.Cells(currentRow, col).Value) Then
+            procent = CDbl(wsProd.Cells(currentRow, col).Value)
+        End If
+        If procent > 0 Then n = n + 1
+    Next col
+    
+    If n = 0 Then
+        MsgBox "Brak surowców o zawartości większej od zera.", vbInformation
+        Exit Sub
+    End If
+    
+    ReDim arrSurowce(1 To n, 1 To 3)
+    
+    ' 3. Pobranie danych
+    i = 0
+    For col = colStart To colEnd
+        
+        nazwa = CStr(wsProd.Cells(2, col).Value)
+        
+        procent = 0
+        If IsNumeric(wsProd.Cells(currentRow, col).Value) Then
+            procent = CDbl(wsProd.Cells(currentRow, col).Value)
+        End If
+        
+        If procent > 0 Then
+            i = i + 1
+            arrSurowce(i, 1) = nazwa
+            arrSurowce(i, 2) = procent
+            
+            ' -----------------------------------------
+            '      NOWA ZASADA: jeśli zawiera "owoc"
+            ' -----------------------------------------
+            If InStr(1, nazwa, "owoc", vbTextCompare) > 0 Then
+                kraj = "Polska"
+            
+            ' -----------------------------------------
+            '   Poprzednia zasada: owoce › kolumna CT
+            '   (ale tylko jeśli nazwa NIE zawiera "owoc")
+            ' -----------------------------------------
+            ElseIf InStr(1, nazwa, "owoce", vbTextCompare) > 0 Then
+                kraj = CStr(wsProd.Cells(currentRow, colCT).Value)
+            
+            Else
+                'Pozostałe surowce – standardowe dopasowanie
+                kraj = ""
+                nm = LCase$(Trim$(nazwa))
+                
+                For Each colHeader In headerRngKraje
+                    hdr = LCase$(Trim$(CStr(colHeader.Value)))
+                    
+                    If hdr <> "" Then
+                        If StrComp(hdr, nm, vbTextCompare) = 0 _
+                        Or InStr(nm, hdr) > 0 _
+                        Or InStr(hdr, nm) > 0 Then
+                            
+                            kraj = CStr(wsProd.Cells(currentRow, colHeader.Column).Value)
+                            Exit For
+                        End If
+                    End If
+                Next colHeader
+            End If
+            
+            arrSurowce(i, 3) = kraj
+        End If
+    Next col
+    
+    ' 4. Sortowanie malejąco po procentach
+    Do
+        swapped = False
+        For i = 1 To n - 1
+            If CDbl(arrSurowce(i, 2)) < CDbl(arrSurowce(i + 1, 2)) Then
+                
+                tmp1 = arrSurowce(i, 1)
+                tmp2 = arrSurowce(i, 2)
+                tmp3 = arrSurowce(i, 3)
+                
+                arrSurowce(i, 1) = arrSurowce(i + 1, 1)
+                arrSurowce(i, 2) = arrSurowce(i + 1, 2)
+                arrSurowce(i, 3) = arrSurowce(i + 1, 3)
+                
+                arrSurowce(i + 1, 1) = tmp1
+                arrSurowce(i + 1, 2) = tmp2
+                arrSurowce(i + 1, 3) = tmp3
+                
+                swapped = True
+            End If
+        Next i
+    Loop While swapped
+    
+    ' 5. Wpisywanie danych
+    maxRows = 192 - 178 + 1
+    
+    ClearRangeRespectMerges wsKarta.Range("A178:A192")
+    ClearRangeRespectMerges wsKarta.Range("E178:E192")
+    ClearRangeRespectMerges wsKarta.Range("G178:G192")
+    
+    outRows = Application.WorksheetFunction.Min(n, maxRows)
+    
+    For i = 1 To outRows
+        
+        wsKarta.Cells(178 + i - 1, "A").Value = arrSurowce(i, 1)
+        
+        Dim v As Double
+        Dim rngPct As Range
+        
+        v = CDbl(arrSurowce(i, 2)) / 100
+        
+        Set rngPct = wsKarta.Cells(178 + i - 1, "E")
+        With rngPct.MergeArea
+            .Value = v
+            .NumberFormatLocal = "0,000%"   ' <<< 3 miejsca po przecinku
+        End With
+        
+        wsKarta.Cells(178 + i - 1, "G").Value = arrSurowce(i, 3)
+    
+    Next i
+    
+End Sub
+
+
+
+

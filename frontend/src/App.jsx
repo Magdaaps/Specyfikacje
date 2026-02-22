@@ -1,0 +1,405 @@
+import React, { useState, useEffect, useMemo } from 'react'
+import axios from 'axios'
+import {
+  Package,
+  Database,
+  Settings,
+  Search,
+  Plus,
+  Download,
+  Cloud,
+  ChevronRight,
+  Info,
+  AlertTriangle,
+  FileSpreadsheet,
+  ArrowLeft,
+  FolderPlus
+} from 'lucide-react'
+import ProductDetails from './ProductDetails'
+import AddProductModal from './AddProductModal'
+import AddSurowiecModal from './AddSurowiecModal'
+import Notification from './Notification'
+import logo from './assets/logo.png'
+
+const API_BASE = "http://127.0.0.1:8000"
+
+function App() {
+  const [activeTab, setActiveTab] = useState('produkty')
+  const [produkty, setProdukty] = useState([])
+  const [surowce, setSurowce] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [selectedProductEan, setSelectedProductEan] = useState(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showAddSurowiecModal, setShowAddSurowiecModal] = useState(false)
+  const [editingSurowiec, setEditingSurowiec] = useState(null)
+  const [notification, setNotification] = useState(null)
+
+  // New state for categories
+  const [selectedCategory, setSelectedCategory] = useState(null)
+
+  useEffect(() => {
+    // Setup Axios Interceptor
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        const message = error.response?.data?.error || error.message || "Wystąpił nieoczekiwany błąd"
+        setNotification({ message, type: 'error' })
+        return Promise.reject(error)
+      }
+    )
+    return () => axios.interceptors.response.eject(interceptor)
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [activeTab])
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const endpoint = activeTab === 'produkty' ? '/produkty' : '/surowce'
+      const res = await axios.get(`${API_BASE}${endpoint}`)
+      if (activeTab === 'produkty') setProdukty(res.data)
+      else setSurowce(res.data)
+    } catch (err) {
+      console.error("Error fetching data:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Categories calculation
+  const categories = useMemo(() => {
+    const cats = {}
+    surowce.forEach(s => {
+      const cat = s.kategoria || 'Inne'
+      cats[cat] = (cats[cat] || 0) + 1
+    })
+    return Object.entries(cats).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [surowce])
+
+  const filteredItems = useMemo(() => {
+    if (activeTab === 'produkty') {
+      return produkty.filter(item =>
+        (item.nazwa_pl || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.ean || "").includes(searchTerm)
+      )
+    } else {
+      // Global search for surowce
+      if (searchTerm) {
+        return surowce.filter(item =>
+          (item.nazwa || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item.kategoria || "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      }
+      // Category view
+      if (selectedCategory) {
+        return surowce.filter(item => (item.kategoria || 'Inne') === selectedCategory)
+      }
+      return [] // When in categories view
+    }
+  }, [activeTab, produkty, surowce, searchTerm, selectedCategory])
+
+  const handleAddCategory = () => {
+    const name = prompt("Podaj nazwę nowej kategorii:")
+    if (name) {
+      setEditingSurowiec({ kategoria: name, nazwa: '' })
+      setShowAddSurowiecModal(true)
+    }
+  }
+
+  return (
+    <div className="flex h-screen bg-choco-50 text-choco-900 overflow-hidden font-sans">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-choco-100 flex flex-col p-6 shadow-xl">
+        <div className="flex flex-col items-center gap-2 mb-10 px-2">
+          <img src={logo} alt="Adikam Logo" className="w-32 h-auto drop-shadow-md" />
+          <h1 className="font-black text-xs uppercase tracking-[0.3em] text-choco-800 mt-2">Specyfikacje</h1>
+        </div>
+
+        <nav className="space-y-2 flex-1">
+          <button
+            onClick={() => {
+              setActiveTab('produkty')
+              setSearchTerm('')
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'produkty' ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/40' : 'text-choco-600 hover:bg-choco-50'}`}
+          >
+            <Package className="w-5 h-5" />
+            <span className="font-medium">Produkty</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('surowce')
+              setSearchTerm('')
+              setSelectedCategory(null)
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'surowce' ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/40' : 'text-choco-600 hover:bg-choco-50'}`}
+          >
+            <Database className="w-5 h-5" />
+            <span className="font-medium">Baza Surowców</span>
+          </button>
+        </nav>
+
+        <div className="mt-auto pt-6 border-t border-choco-100 space-y-2">
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-choco-500 hover:bg-choco-50 transition-all">
+            <Cloud className="w-5 h-5 text-gold-600" />
+            <span className="font-medium">SharePoint</span>
+          </button>
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-choco-500 hover:bg-choco-50 transition-all">
+            <Settings className="w-5 h-5" />
+            <span className="font-medium">Ustawienia</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden bg-choco-100/30">
+        <header className="h-24 border-b border-choco-200 flex items-center justify-between px-8 bg-white/40 backdrop-blur-xl sticky top-0 z-10">
+          <div className="relative w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-choco-300" />
+            <input
+              type="text"
+              placeholder={activeTab === 'produkty' ? "Szukaj produktów (nazwa, EAN)..." : "Szukaj surowców (globalnie)..."}
+              className="w-full bg-choco-100/30 border border-choco-100 rounded-full py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-choco-500/50 transition-all placeholder:text-choco-300"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            {activeTab === 'surowce' && !searchTerm && !selectedCategory && (
+              <button
+                onClick={handleAddCategory}
+                className="bg-white border border-choco-200 text-choco-700 hover:bg-choco-50 px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 transition-all"
+              >
+                <FolderPlus className="w-4 h-4" />
+                Dodaj kategorię
+              </button>
+            )}
+            <button
+              onClick={() => activeTab === 'produkty' ? setShowAddModal(true) : setShowAddSurowiecModal(true)}
+              className="bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg shadow-choco-900/30 transition-all transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              Dodaj {activeTab === 'produkty' ? 'Produkt' : 'Surowiec'}
+            </button>
+          </div>
+        </header>
+
+        <section className="flex-1 p-8 overflow-auto custom-scrollbar">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <p className="text-gold-600 font-black text-[10px] uppercase tracking-[0.3em] mb-1">System Zarządzania</p>
+                <div className="flex items-center gap-4">
+                  {activeTab === 'surowce' && (selectedCategory || searchTerm) && (
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(null)
+                        setSearchTerm('')
+                      }}
+                      className="p-2 bg-white border border-choco-100 rounded-full text-choco-400 hover:text-choco-800 transition-all shadow-sm"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                  )}
+                  <h2 className="text-4xl font-black text-choco-800 tracking-tighter">
+                    {activeTab === 'produkty' ? 'Katalog Wyrobów' :
+                      (searchTerm ? 'Wyniki wyszukiwania' :
+                        (selectedCategory ? selectedCategory : 'Baza Surowców'))}
+                  </h2>
+                </div>
+              </div>
+              <div className="text-right text-choco-600 text-sm font-black">
+                {activeTab === 'produkty' || searchTerm || selectedCategory ? `${filteredItems.length} POZYCJI` : `${categories.length} KATEGORII`}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                {[1, 2, 3, 4, 5, 6].map(n => (
+                  <div key={n} className="h-48 bg-white rounded-2xl border border-choco-100"></div>
+                ))}
+              </div>
+            ) : activeTab === 'surowce' ? (
+              <>
+                {/* Cases: Global Search, Category Items, or Categories List */}
+                {searchTerm ? (
+                  // Global Search Results
+                  <div className="flex flex-col gap-2">
+                    {filteredItems.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          setEditingSurowiec(item)
+                          setShowAddSurowiecModal(true)
+                        }}
+                        className="bg-white border border-choco-100 rounded-xl px-6 py-4 hover:border-choco-400 hover:shadow-xl hover:shadow-choco-900/5 transition-all group cursor-pointer flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="bg-choco-50 p-2 rounded-lg text-choco-600 group-hover:bg-choco-700 group-hover:text-white transition-colors">
+                            <Database className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-choco-800 group-hover:text-choco-900 transition-colors uppercase tracking-tight">
+                              {item.nazwa} ({item.kategoria || 'Inne'})
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                      </div>
+                    ))}
+                    {filteredItems.length === 0 && (
+                      <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
+                        <p className="text-choco-400 font-bold uppercase tracking-widest">Nie znaleziono surowców spełniających kryteria.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : selectedCategory ? (
+                  // Items in specific category
+                  <div className="flex flex-col gap-2">
+                    {filteredItems.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          setEditingSurowiec(item)
+                          setShowAddSurowiecModal(true)
+                        }}
+                        className="bg-white border border-choco-100 rounded-xl px-6 py-4 hover:border-choco-400 hover:shadow-xl hover:shadow-choco-900/5 transition-all group cursor-pointer flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="bg-choco-50 p-2 rounded-lg text-choco-600 group-hover:bg-choco-700 group-hover:text-white transition-colors">
+                            <Database className="w-4 h-4" />
+                          </div>
+                          <span className="font-bold text-choco-800 group-hover:text-choco-900 transition-colors uppercase tracking-tight">
+                            {item.nazwa}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                      </div>
+                    ))}
+                    {filteredItems.length === 0 && (
+                      <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
+                        <p className="text-choco-400 font-bold uppercase tracking-widest">Brak surowców w tej kategorii.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Categories List
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {categories.map(cat => (
+                      <div
+                        key={cat.name}
+                        onClick={() => setSelectedCategory(cat.name)}
+                        className="bg-white border border-choco-100 rounded-3xl p-8 hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/10 transition-all group cursor-pointer flex flex-col items-center text-center relative overflow-hidden"
+                      >
+                        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                          <Database className="w-24 h-24" />
+                        </div>
+                        <div className="w-16 h-16 bg-choco-50 rounded-2xl flex items-center justify-center text-choco-600 mb-6 group-hover:bg-choco-800 group-hover:text-white transition-all shadow-inner">
+                          <Database className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-black text-choco-800 mb-2 uppercase tracking-tight group-hover:text-choco-950 transition-colors">
+                          {cat.name} ({cat.count})
+                        </h3>
+                      </div>
+                    ))}
+                    {categories.length === 0 && (
+                      <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
+                        <p className="text-choco-400 font-bold uppercase tracking-widest">Baza surowców jest pusta.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              // Produkty Catalog
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {filteredItems.map(item => (
+                  <div
+                    key={item.ean}
+                    onClick={() => setSelectedProductEan(item.ean)}
+                    className="bg-white border border-choco-100 rounded-3xl overflow-hidden hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/15 transition-all group cursor-pointer shadow-sm flex flex-col"
+                  >
+                    {/* Image Section */}
+                    <div className="aspect-[4/3] bg-choco-50/50 relative overflow-hidden flex items-center justify-center p-6">
+                      <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+                      <img
+                        src={item.image_url ? `${API_BASE}${item.image_url}` : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
+                        alt={item.nazwa_pl}
+                        className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 z-20 drop-shadow-md"
+                      />
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg z-30">
+                        <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean.slice(-6)}</span>
+                      </div>
+                    </div>
+
+                    {/* Content Section */}
+                    <div className="p-6 flex flex-col flex-1">
+                      <div className="flex-1">
+                        <p className="text-gold-600 font-black text-[9px] uppercase tracking-[0.2em] mb-2">Specyfikacja Wyrobu</p>
+                        <h3 className="font-bold text-lg text-choco-900 group-hover:text-choco-700 transition-colors uppercase tracking-tight leading-snug line-clamp-2 min-h-[3rem]">
+                          {item.nazwa_pl}
+                        </h3>
+                      </div>
+
+                      <div className="mt-6 pt-5 border-t border-choco-50 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-choco-300 uppercase tracking-widest text-[9px] font-bold">Kod EAN</span>
+                          <span className="text-choco-700 font-mono font-bold text-xs tracking-wider">{item.ean}</span>
+                        </div>
+                        <div className="bg-choco-50 p-2 rounded-xl text-choco-400 group-hover:bg-gold-500 group-hover:text-white transition-all shadow-inner">
+                          <Package className="w-5 h-5" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {selectedProductEan && (
+          <ProductDetails
+            ean={selectedProductEan}
+            onClose={() => setSelectedProductEan(null)}
+            onRefresh={fetchData}
+            notify={(msg, type) => setNotification({ message: msg, type })}
+          />
+        )}
+
+        {showAddModal && (
+          <AddProductModal
+            onClose={() => setShowAddModal(false)}
+            onRefresh={fetchData}
+            notify={(msg, type) => setNotification({ message: msg, type })}
+          />
+        )}
+
+        {(showAddSurowiecModal || editingSurowiec) && (
+          <AddSurowiecModal
+            surowiec={editingSurowiec}
+            onClose={() => {
+              setShowAddSurowiecModal(false)
+              setEditingSurowiec(null)
+            }}
+            onRefresh={fetchData}
+            notify={(msg, type) => setNotification({ message: msg, type })}
+          />
+        )}
+
+        {notification && (
+          <Notification
+            message={notification.message}
+            type={notification.type}
+            onClose={() => setNotification(null)}
+          />
+        )}
+      </main>
+    </div>
+  )
+}
+
+export default App

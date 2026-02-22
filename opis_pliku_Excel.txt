@@ -1,0 +1,404 @@
+Opis pliku XLS
+
+Nazwa robocza: BAZA_SUROWCÓW – Wszystkie surowce – najnowszy
+Typ: Excel z makrami (.xlsm)
+Rola: Jednocześnie:
+
+baza danych surowców,
+
+baza danych produktów,
+
+silnik obliczeniowy (makra),
+
+generator kart produktu (PL i EN).
+
+Plik jest używany codziennie przez dział jakości, do tworzenia jednej karty produktu na raz.
+
+Ogólna architektura pliku
+
+Plik składa się z 8 arkuszy, z czego:
+
+3 arkusze są bazami danych,
+
+1 arkusz jest konfiguracyjny (mapowanie),
+
+1 arkusz jest słownikowy,
+
+2 arkusze są szablonami wyjściowymi,
+
+1 arkusz jest pomocniczą bazą wag/procentów.
+
+Makra:
+
+pobierają dane z baz,
+
+wykonują obliczenia,
+
+wypełniają szablon karty produktu,
+
+zapisują wynikowy plik XLS.
+
+Arkusz 1: Surowce
+Rola
+
+Centralna baza danych surowców, z których budowane są produkty gotowe.
+
+Charakterystyka struktury
+
+ok. 80+ kolumn
+
+1 wiersz = 1 surowiec
+
+dane wpisywane ręcznie, głównie na podstawie PDF-ów od dostawców
+
+Grupy danych
+A. Identyfikacja
+
+Lp
+
+Nazwa surowca (klucz logiczny w arkuszu „Produkty”)
+
+B. Wartości odżywcze (na 100 g)
+
+Energia [kJ/100g]
+
+Energia [kcal/100g]
+
+Tłuszcz [g]
+
+Kwasy tłuszczowe nasycone [g]
+
+Węglowodany [g]
+
+Cukry [g]
+
+Białko [g]
+
+Sól [g]
+
+Te wartości są później ważone procentowo przy obliczaniu wartości odżywczych produktu.
+
+C. Składniki / alergeny (forma problematyczna)
+
+Każdy potencjalny składnik/alergen jest osobną kolumną (np.):
+
+mleko
+
+soja
+
+orzech laskowy
+
+pistacja
+
+mąka pszenna
+
+emulgatory
+
+oleje roślinne
+
+W komórkach:
+
+pusto / wartość → oznacza obecność składnika w surowcu
+
+To jest główne źródło problemów ze skalowalnością (dodanie nowego składnika = nowa kolumna).
+
+Arkusz 2: Produkty
+Rola
+
+Definicja produktu gotowego + jego składu surowcowego.
+
+Charakterystyka struktury
+
+ok. 140 kolumn
+
+1 wiersz = 1 produkt
+
+struktura „szeroka” (każdy surowiec jako osobna kolumna)
+
+Grupy danych
+A. Dane podstawowe
+
+ProductID (wewnętrzny identyfikator – historyczny)
+
+Nazwa produktu
+
+Waga (g)
+
+B. Skład produktu (rdzeń logiki)
+
+Każdy surowiec z arkusza „Surowce” występuje jako osobna kolumna
+
+Wartość w komórce = procentowy udział surowca w produkcie
+
+Suma procentów = 100
+
+Na tej podstawie:
+
+liczone są wartości odżywcze produktu,
+
+generowany jest tekst składu,
+
+wyciągane są alergeny i kraje pochodzenia.
+
+C. Alergeny produktu
+
+Kolumny odpowiadają alergenom UE (14)
+
+Wartości:
+
+„Zawiera”
+
+„Może zawierać”
+
+„Nie zawiera”
+
+Częściowo liczone automatycznie z surowców
+
+Arkusz 3: Baza_produktów
+Rola
+
+Pozostałe informacje opisowe i formalne o produkcie.
+
+Charakterystyka
+
+ok. 50 kolumn
+
+1 wiersz = 1 produkt
+
+dane w większości:
+
+wpisywane ręcznie,
+
+kopiowane z podobnych produktów
+
+Grupy danych
+A. Informacje ogólne
+
+ProductID
+
+Nazwa handlowa
+
+Nazwa prawna
+
+Kategoria
+
+B. Certyfikaty
+
+Rodzaj certyfikatu (np. IFS)
+
+COID
+
+Data ważności
+
+C. Kody
+
+EAN sztuki (faktyczny klucz produktu)
+
+EAN kartonu
+
+CN
+
+PKWiU
+
+D. Organoleptyka
+
+Wygląd
+
+Zapach
+
+Smak
+
+Konsystencja
+
+Wygląd na przekroju
+
+E. Warunki i trwałość
+
+Warunki przechowywania i transportu
+
+Termin przydatności do spożycia
+
+Format daty („Najlepiej spożyć przed…”)
+
+F. Informacje dodatkowe
+
+Informacje prawne
+
+GMO / radiacja
+
+Inne uwagi
+
+G. Etykiety
+
+Polska etykieta (tekst)
+
+Angielska etykieta (tekst – obecnie ręczna, docelowo ma być generowana)
+
+Arkusz 4: Karta produktu
+Rola
+
+Finalna karta produktu w języku polskim.
+
+Charakterystyka
+
+Szablon (layout)
+
+Brak danych źródłowych
+
+Komórki są wypełniane przez makra
+
+Układ jest „święty” (niezmieniany)
+
+Zawartość
+
+Dane identyfikacyjne
+
+Skład
+
+Wartości odżywcze
+
+Alergeny
+
+Logistyka
+
+Organoleptyka
+
+Warunki
+
+Informacje formalne
+
+Arkusz 5: Product specification
+Rola
+
+Angielska wersja karty produktu.
+
+Stan obecny
+
+Strukturalnie kopia karty PL
+
+Mechanizm automatycznego wypełniania nie działa poprawnie
+
+Docelowo:
+
+ma być generowana automatycznie z tych samych danych co PL
+
+z użyciem słowników tłumaczeń
+
+Arkusz 6: Wagi i procenty składowych
+Rola
+
+Dodatkowa baza dla produktów złożonych (np. wiele rodzajów czekolady).
+
+Zawartość
+
+Dokładne gramatury i procenty surowców
+
+Używane pomocniczo w obliczeniach
+
+Arkusz 7: Mapowanie
+Rola
+
+Techniczna konfiguracja makr.
+
+Charakterystyka
+
+49 wierszy
+
+3 kolumny:
+
+Źródło z Baza_produktów (np. A{ROW})
+
+Źródło z Produkty (np. B{ROW})
+
+Cel: adres komórki w Karta produktu (np. A14)
+
+Znaczenie
+
+Określa:
+
+które pole danych
+
+trafia do której komórki karty
+
+Silnie zależne od:
+
+pozycji kolumn
+
+struktury arkuszy
+
+Arkusz 8: SLOWNIKI
+Rola
+
+Zbiór słowników i danych referencyjnych.
+
+Zawartość
+
+Alergeny UE (14) + statusy
+
+Opisy produktów
+
+Opisy CN
+
+Kody CN
+
+Kody PKWiU
+
+Kategorie sezonowe (Walentynki, Wielkanoc, itd.)
+
+Logika działania całego pliku (w skrócie)
+
+Użytkownik uzupełnia:
+
+surowce,
+
+produkt,
+
+bazę produktów.
+
+Makra:
+
+liczą wartości odżywcze produktu,
+
+generują skład,
+
+agregują alergeny i kraje pochodzenia.
+
+Makra, na podstawie arkusza Mapowanie:
+
+wypełniają szablon Karta produktu.
+
+Wynik:
+
+karta produktu w XLS,
+
+zapisywana ręcznie na SharePoint,
+
+sprawdzana i wysyłana do sprzedaży.
+
+Kluczowe problemy obecnego rozwiązania
+
+Silna zależność od kolejności kolumn
+
+Dodanie nowego surowca/składnika = ryzyko uszkodzenia makr
+
+Brak prawdziwego modelu danych
+
+EN karta nie jest stabilnie generowana
+
+Excel pełni jednocześnie 4 role (DB + logika + UI + eksport)
+
+Intencja nowego rozwiązania
+
+Nowa aplikacja ma:
+
+zachować ten sam efekt końcowy (identyczne karty XLS),
+
+ale:
+
+rozdzielić dane, logikę i eksport,
+
+oprzeć się na modelu danych, nie kolumnach,
+
+generować PL i EN automatycznie,
+
+być odporna na zmiany struktury surowców.
