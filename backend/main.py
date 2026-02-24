@@ -294,7 +294,7 @@ def download_pdf(ean: str, db: Session = Depends(get_db)):
             media_type="application/pdf"
         )
     except Exception as e:
-        logger.error(f"PDF generation failed for EAN {ean}: {e}")
+        logger.exception(f"PDF generation failed for EAN {ean}: {e}")
         raise exceptions.AppError(f"Failed to generate PDF file: {str(e)}")
 
 # --- UPLOAD ---

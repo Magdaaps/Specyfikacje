@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import {
     X,
@@ -17,6 +17,46 @@ import {
 
 const API_BASE = "http://127.0.0.1:8000"
 
+// ---------------------------------------------------------------------------
+// Allergen auto-bolding
+// ---------------------------------------------------------------------------
+const _PL_CHARS = 'a-zA-ZąęóśźżćńłĄĘÓŚŹŻĆŃŁ'
+
+const _ALLERGEN_BOLD_WORDS = [
+    // Multi-word phrases first (longest → shortest prevents partial overlap)
+    'orzeszki arachidowe',
+    'orzechy laskowe',
+    // Single words
+    'mleko', 'mleka', 'mleczne', 'mleczny',
+    'soja', 'soi', 'sojowa', 'sojowe',
+    'gluten', 'pszenna',
+    'jaja', 'jaj',
+    'orzechy', 'migdały', 'pistacje', 'pisatacje',
+    'sezam',
+]
+
+const _allergenPattern = new RegExp(
+    `(?<![${_PL_CHARS}])(${[..._ALLERGEN_BOLD_WORDS]
+        .sort((a, b) => b.length - a.length)
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|')})(?![${_PL_CHARS}])`,
+    'gi'
+)
+
+function _escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+}
+
+function boldAllergens(text) {
+    if (!text) return ''
+    return _escapeHtml(text).replace(_allergenPattern, '<strong>$1</strong>')
+}
+
 export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     const [product, setProduct] = useState(null)
     const [initialProduct, setInitialProduct] = useState(null)
@@ -27,6 +67,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     const [availableSurowce, setAvailableSurowce] = useState([])
     const [showAddMenu, setShowAddMenu] = useState(false)
     const [suggestions, setSuggestions] = useState({})
+    const userChangedInputRef = useRef(false)
+    const palletHeightChangedRef = useRef(false)
 
     const isDirty = () => {
         return JSON.stringify(product) !== JSON.stringify(initialProduct)
@@ -56,6 +98,51 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     useEffect(() => {
         fetchData()
     }, [ean])
+
+    useEffect(() => {
+        if (!userChangedInputRef.current) return
+        userChangedInputRef.current = false
+        setProduct(prev => {
+            if (!prev) return prev
+            const sztuki = prev.logistyka_sztuk_w_zbiorczym
+            const kartony = prev.logistyka_kartonow_na_warstwie
+            const warstwy = prev.logistyka_warstw_na_palecie
+            const hasVal = (v) => v != null && v !== ''
+            return {
+                ...prev,
+                logistyka_sztuk_na_warstwie: (hasVal(sztuki) && hasVal(kartony))
+                    ? Math.trunc(Number(sztuki) * Number(kartony)) : null,
+                logistyka_kartonow_na_palecie: (hasVal(kartony) && hasVal(warstwy))
+                    ? Math.trunc(Number(kartony) * Number(warstwy)) : null,
+                logistyka_sztuk_na_palecie: (hasVal(sztuki) && hasVal(kartony) && hasVal(warstwy))
+                    ? Math.trunc(Number(sztuki) * Number(kartony) * Number(warstwy)) : null,
+            }
+        })
+    }, [product?.logistyka_sztuk_w_zbiorczym, product?.logistyka_kartonow_na_warstwie, product?.logistyka_warstw_na_palecie])
+
+    useEffect(() => {
+        if (!palletHeightChangedRef.current) return
+        palletHeightChangedRef.current = false
+        setProduct(prev => {
+            if (!prev) return prev
+            const warstwy = prev.logistyka_warstw_na_palecie
+            const h1 = prev.logistyka_wymiary_zbiorcze1_h
+            const h2 = prev.logistyka_wymiary_zbiorcze2_h
+            const h3 = prev.logistyka_wymiary_zbiorcze3_h
+            const hasVal = (v) => v != null && v !== '' && Number(v) > 0
+            let selectedHeight = null
+            if (hasVal(h3)) selectedHeight = Number(h3)
+            else if (hasVal(h2)) selectedHeight = Number(h2)
+            else if (hasVal(h1)) selectedHeight = Number(h1)
+            if (!hasVal(warstwy) || selectedHeight === null) {
+                return { ...prev, logistyka_wysokosc_palety: null }
+            }
+            return {
+                ...prev,
+                logistyka_wysokosc_palety: Number(warstwy) * selectedHeight + 15,
+            }
+        })
+    }, [product?.logistyka_warstw_na_palecie, product?.logistyka_wymiary_zbiorcze1_h, product?.logistyka_wymiary_zbiorcze2_h, product?.logistyka_wymiary_zbiorcze3_h])
 
     const fetchData = async () => {
         setLoading(true)
@@ -668,7 +755,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                             {liveNutrition && Object.entries(liveNutrition).map(([key, val]) => (
                                                 <div key={key} className="flex justify-between text-sm py-2 border-b border-choco-100/50 last:border-0 text-choco-600">
                                                     <span>{nutritionLabels[key]}</span>
-                                                    <span className="text-choco-900 font-bold">{val.toFixed(1)} {key.includes('energia') ? (key === 'energia_kj' ? 'kJ' : 'kcal') : 'g'}</span>
+                                                    <span className="text-choco-900 font-bold">{key === 'sol' ? val.toFixed(2) : key === 'bialko' ? val.toFixed(1) : Math.round(val)} {key.includes('energia') ? (key === 'energia_kj' ? 'kJ' : 'kcal') : 'g'}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -692,9 +779,10 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                 {/* Ingr List */}
                                 <div className="pt-8 border-t border-choco-100">
                                     <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">Skład</h4>
-                                    <div className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic">
-                                        {analysis?.ingredients_pl}
-                                    </div>
+                                    <div
+                                        className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic"
+                                        dangerouslySetInnerHTML={{ __html: boldAllergens(analysis?.ingredients_pl || '') }}
+                                    />
                                 </div>
 
                                 {/* Percentage and Origins List */}
@@ -711,7 +799,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                                 </span>
                                                 <span className="text-choco-300">—</span>
                                                 <span className="font-black text-gold-600 w-20 text-center">
-                                                    {item.percent.toFixed(2).replace('.', ',')}%
+                                                    {(item.percent >= 1 ? item.percent.toFixed(1) : item.percent.toFixed(2)).replace('.', ',')}%
                                                 </span>
                                                 <span className="text-choco-300">—</span>
                                                 <span className="text-choco-500 italic font-medium flex-1">
@@ -751,9 +839,9 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                                 {[
                                                     { label: 'Produkt solo', prefix: 'logistyka_wymiary_solo' },
                                                     { label: 'W opakowaniu jednostkowym', prefix: 'logistyka_wymiary_jednostka' },
-                                                    { label: 'Opakowanie zbiorcze 1°', prefix: 'logistyka_wymiary_zbiorcze1' },
-                                                    { label: 'Opakowanie zbiorcze 2°', prefix: 'logistyka_wymiary_zbiorcze2' },
-                                                    { label: 'Opakowanie zbiorcze 3°', prefix: 'logistyka_wymiary_zbiorcze3' },
+                                                    { label: 'Opakowanie zbiorcze 1°', prefix: 'logistyka_wymiary_zbiorcze1', affectsPalletHeight: true },
+                                                    { label: 'Opakowanie zbiorcze 2°', prefix: 'logistyka_wymiary_zbiorcze2', affectsPalletHeight: true },
+                                                    { label: 'Opakowanie zbiorcze 3°', prefix: 'logistyka_wymiary_zbiorcze3', affectsPalletHeight: true },
                                                 ].map((row) => (
                                                     <tr key={row.prefix} className="border-b border-choco-50 last:border-0 hover:bg-choco-50/30 transition-colors">
                                                         <td className="px-6 py-4 text-sm font-bold text-choco-700">{row.label}</td>
@@ -764,7 +852,10 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                                                     step="0.01"
                                                                     min="0"
                                                                     value={product[`${row.prefix}_${dim}`] || 0}
-                                                                    onChange={(e) => setProduct({ ...product, [`${row.prefix}_${dim}`]: parseFloat(e.target.value) || 0 })}
+                                                                    onChange={(e) => {
+                                                                if (dim === 'h' && row.affectsPalletHeight) palletHeightChangedRef.current = true
+                                                                setProduct({ ...product, [`${row.prefix}_${dim}`]: parseFloat(e.target.value) || 0 })
+                                                            }}
                                                                     className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2 text-center font-medium"
                                                                 />
                                                             </td>
@@ -863,22 +954,31 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                     </h3>
                                     <div className="grid grid-cols-2 gap-x-12 gap-y-6 bg-white border border-choco-100 p-8 rounded-2xl shadow-sm">
                                         {[
-                                            { label: 'Ilość sztuk w opakowaniu zbiorczym [szt]', key: 'logistyka_sztuk_w_zbiorczym', isInt: true },
-                                            { label: 'Ilość kartonów na warstwie [szt]', key: 'logistyka_kartonow_na_warstwie', isInt: true },
-                                            { label: 'Ilość warstw na palecie [szt]', key: 'logistyka_warstw_na_palecie', isInt: true },
-                                            { label: 'Ilość kartonów na palecie [szt]', key: 'logistyka_kartonow_na_palecie', isInt: true },
-                                            { label: 'Ilość sztuk na palecie [szt]', key: 'logistyka_sztuk_na_palecie', isInt: true },
-                                            { label: 'Ilość sztuk na warstwie palety [szt]', key: 'logistyka_sztuk_na_warstwie', isInt: true },
-                                            { label: 'Wysokość palety z nośnikiem [cm]', key: 'logistyka_wysokosc_palety', isInt: false },
+                                            { label: 'Ilość sztuk w opakowaniu zbiorczym [szt]', key: 'logistyka_sztuk_w_zbiorczym', isCalcInput: true },
+                                            { label: 'Ilość kartonów na warstwie [szt]', key: 'logistyka_kartonow_na_warstwie', isCalcInput: true },
+                                            { label: 'Ilość warstw na palecie [szt]', key: 'logistyka_warstw_na_palecie', isCalcInput: true, isPalletHeightInput: true },
+                                            { label: 'Ilość sztuk na warstwie palety [szt]', key: 'logistyka_sztuk_na_warstwie', isAuto: true },
+                                            { label: 'Ilość kartonów na palecie [szt]', key: 'logistyka_kartonow_na_palecie', isAuto: true },
+                                            { label: 'Ilość sztuk na palecie [szt]', key: 'logistyka_sztuk_na_palecie', isAuto: true },
+                                            { label: 'Wysokość palety z nośnikiem [cm]', key: 'logistyka_wysokosc_palety', isFloat: true, isAuto: true },
                                         ].map((field) => (
                                             <div key={field.key} className="flex flex-col gap-2">
-                                                <label className="text-[10px] font-black text-choco-400 uppercase tracking-widest">{field.label}</label>
+                                                <label className="text-[10px] font-black text-choco-400 uppercase tracking-widest flex items-center gap-2">
+                                                    {field.label}
+                                                    {field.isAuto && <span className="text-gold-600 text-[8px] bg-gold-600/10 px-1.5 py-0.5 rounded-full font-black normal-case">auto</span>}
+                                                </label>
                                                 <input
                                                     type="number"
-                                                    step={field.isInt ? "1" : "0.01"}
+                                                    step={field.isFloat ? "0.01" : "1"}
                                                     min="0"
-                                                    value={product[field.key] || 0}
-                                                    onChange={(e) => setProduct({ ...product, [field.key]: field.isInt ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0 })}
+                                                    value={product[field.key] ?? ''}
+                                                    onChange={(e) => {
+                                                        if (field.isCalcInput) userChangedInputRef.current = true
+                                                        if (field.isPalletHeightInput) palletHeightChangedRef.current = true
+                                                        const raw = e.target.value
+                                                        const val = raw === '' ? null : (field.isFloat ? parseFloat(raw) : parseInt(raw, 10))
+                                                        setProduct({ ...product, [field.key]: (val !== null && isNaN(val)) ? null : val })
+                                                    }}
                                                     className="w-full bg-choco-50/30 border border-choco-100 rounded-xl px-4 py-3 text-sm font-bold text-choco-800 focus:outline-none focus:ring-2 focus:ring-choco-100 transition-all"
                                                 />
                                             </div>
