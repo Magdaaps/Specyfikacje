@@ -226,6 +226,26 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
         }
     }
 
+    const handleDownloadPDFEn = async () => {
+        try {
+            const response = await axios({
+                url: `${API_BASE}/produkty/${ean}/pdf?lang=en`,
+                method: 'GET',
+                responseType: 'blob',
+            })
+            const url = window.URL.createObjectURL(new Blob([response.data]))
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', `Specyfikacja_${ean}_EN.pdf`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            notify('Downloading EN PDF specification...', 'success')
+        } catch (err) {
+            // Error handled by global interceptor
+        }
+    }
+
     const handleSharePointSync = async (lang = 'pl') => {
         try {
             const folder = prompt("Podaj folder na SharePoint (np. /sites/Marketing/Shared Documents/Karty):", "/Shared Documents")
@@ -1256,11 +1276,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                             Eksport PL
                         </button>
                         <button
-                            onClick={() => handleDownload('en')}
+                            onClick={handleDownloadPDFEn}
                             className="flex items-center justify-center gap-2 bg-choco-100 hover:bg-choco-200 text-choco-700 py-3 rounded-xl font-bold transition-all border border-choco-200 text-xs uppercase tracking-widest"
                         >
                             <FileDown className="w-4 h-4" />
-                            Eksport EN
+                            Eksport EN PDF
                         </button>
                         <button
                             onClick={handleDownloadPDF}

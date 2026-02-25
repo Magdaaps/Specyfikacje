@@ -275,22 +275,23 @@ def sync_to_sharepoint(ean: str, folder: str, lang: str = "pl", db: Session = De
         raise exceptions.SharePointError(f"Failed to sync with SharePoint: {str(e)}")
 
 @app.get("/produkty/{ean}/pdf")
-def download_pdf(ean: str, db: Session = Depends(get_db)):
-    logger.info(f"Generating PDF for EAN: {ean}")
+def download_pdf(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
+    logger.info(f"Generating PDF for EAN: {ean}, lang: {lang}")
     db_produkt = crud.get_produkt(db, ean=ean)
     if not db_produkt:
         raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
-    
+
     try:
-        output = pdf_gen.generate_pdf(db_produkt)
-        
-        filename = f"Specyfikacja_{ean}.pdf"
+        output = pdf_gen.generate_pdf(db_produkt, lang=lang)
+
+        lang_suffix = f"_{lang.upper()}" if lang != "pl" else ""
+        filename = f"Specyfikacja_{ean}{lang_suffix}.pdf"
         headers = {
             'Content-Disposition': f'attachment; filename="{filename}"'
         }
         return Response(
-            content=output.getvalue(), 
-            headers=headers, 
+            content=output.getvalue(),
+            headers=headers,
             media_type="application/pdf"
         )
     except Exception as e:
