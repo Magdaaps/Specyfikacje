@@ -4,7 +4,14 @@ import axios from 'axios'
 
 const API_BASE = "http://127.0.0.1:8000"
 
-export default function AddProductModal({ onClose, onRefresh, notify }) {
+const PRODUCT_TYPE_OPTIONS = [
+    { value: 'lizaki', label: 'Lizaki' },
+    { value: 'figurki', label: 'Figurki' },
+    { value: 'tabliczki', label: 'Tabliczki' },
+    { value: 'inne', label: 'Inne' },
+]
+
+export default function AddProductModal({ onClose, onRefresh, notify, initialProductType = 'inne' }) {
     const [formData, setFormData] = useState({
         ean: '',
         ean_karton: '',
@@ -12,6 +19,7 @@ export default function AddProductModal({ onClose, onRefresh, notify }) {
         nazwa_en: '',
         internal_id: '',
         kategoria: '',
+        product_type: initialProductType,
         masa_netto: '',
         image_url: ''
     })
@@ -135,6 +143,18 @@ export default function AddProductModal({ onClose, onRefresh, notify }) {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
+                                    <label className="block text-[10px] font-black text-choco-600 uppercase tracking-widest mb-1.5">Typ produktu</label>
+                                    <select
+                                        className="w-full bg-choco-50/50 border border-choco-100 rounded-xl px-4 py-3 focus:ring-4 focus:ring-choco-100/50 outline-none transition-all font-bold text-choco-900"
+                                        value={formData.product_type}
+                                        onChange={(e) => setFormData({ ...formData, product_type: e.target.value })}
+                                    >
+                                        {PRODUCT_TYPE_OPTIONS.map(o => (
+                                            <option key={o.value} value={o.value}>{o.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
                                     <label className="block text-[10px] font-black text-choco-600 uppercase tracking-widest mb-1.5">Kategoria</label>
                                     <input
                                         type="text"
@@ -143,15 +163,15 @@ export default function AddProductModal({ onClose, onRefresh, notify }) {
                                         onChange={(e) => setFormData({ ...formData, kategoria: e.target.value })}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-choco-600 uppercase tracking-widest mb-1.5">Masa Netto (g)</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-choco-50/50 border border-choco-100 rounded-xl px-4 py-3 focus:ring-4 focus:ring-choco-100/50 outline-none transition-all font-bold text-choco-900"
-                                        value={formData.masa_netto}
-                                        onChange={(e) => setFormData({ ...formData, masa_netto: e.target.value })}
-                                    />
-                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-choco-600 uppercase tracking-widest mb-1.5">Masa Netto (g)</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-choco-50/50 border border-choco-100 rounded-xl px-4 py-3 focus:ring-4 focus:ring-choco-100/50 outline-none transition-all font-bold text-choco-900"
+                                    value={formData.masa_netto}
+                                    onChange={(e) => setFormData({ ...formData, masa_netto: e.target.value })}
+                                />
                             </div>
                         </div>
                     </div>

@@ -690,11 +690,14 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
                 margin-top: 20pt;
                 margin-bottom: 5pt;
             }}
-            .subtitle {{
+            .subtitle-cell {{
                 text-align: center;
                 font-size: 14pt;
                 font-weight: bold;
-                margin-bottom: 15pt;
+                white-space: normal;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                overflow: visible;
             }}
             .divider {{
                 border-bottom: 0.5pt solid #ccc;
@@ -789,7 +792,9 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
         </div>
 
         <div class="title">{_s('SPECYFIKACJA WYROBU')}</div>
-        <div class="subtitle">{product_name}</div>
+        <table style="width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 15pt;">
+            <tr><td class="subtitle-cell">{product_name}</td></tr>
+        </table>
         {product_image_html}
         <div class="divider"></div>
 

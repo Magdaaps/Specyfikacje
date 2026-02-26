@@ -56,6 +56,7 @@ class Produkt(Base):
     prawna_nazwa_pl = Column(String)
     prawna_nazwa_en = Column(String)
     kategoria = Column(String)
+    product_type = Column(String, default="inne")  # lizaki | figurki | tabliczki | inne
     masa_netto = Column(String)
     image_url = Column(String) # Path to uploaded image
     

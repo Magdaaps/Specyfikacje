@@ -246,6 +246,30 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
         }
     }
 
+    const handleDownloadExcelEn = async () => {
+        try {
+            const response = await axios({
+                url: `${API_BASE}/produkty/${ean}/download?lang=en`,
+                method: 'GET',
+                responseType: 'blob',
+            })
+            const url = window.URL.createObjectURL(new Blob([response.data]))
+            const link = document.createElement('a')
+            link.href = url
+            const safeName = (product?.nazwa_pl || ean)
+                .replace(/[^\w\sąęóśźżćńłĄĘÓŚŹŻĆŃŁ-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-')
+            link.setAttribute('download', `${safeName}_EN.xlsx`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            notify('Pobieranie karty EN (XLSX) rozpoczęte', 'success')
+        } catch (err) {
+            // Global interceptor handles the notification
+        }
+    }
+
     const handleSharePointSync = async (lang = 'pl') => {
         try {
             const folder = prompt("Podaj folder na SharePoint (np. /sites/Marketing/Shared Documents/Karty):", "/Shared Documents")
@@ -273,6 +297,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                 prawna_nazwa_pl: product.prawna_nazwa_pl,
                 prawna_nazwa_en: product.prawna_nazwa_en,
                 kategoria: product.kategoria,
+                product_type: product.product_type || 'inne',
                 masa_netto: product.masa_netto,
                 image_url: product.image_url,
                 skladniki: product.skladniki.map(s => ({
@@ -428,44 +453,67 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                             />
                         </div>
 
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                                <div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start gap-3">
+                                <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 text-gold-600 text-[10px] font-black uppercase tracking-[0.2em] mb-2">
                                         <Info className="w-3 h-3" />
                                         Specyfikacja Wyrobu
                                     </div>
-                                    <h2 className="text-xl font-black text-choco-900 leading-tight uppercase tracking-tight">{product.nazwa_pl}</h2>
-                                    <div className="flex gap-4 mt-4">
-                                        <div className="bg-choco-50 px-4 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
-                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1">EAN Sztuka (Główny)</span>
+                                    <textarea
+                                        value={product.nazwa_pl || ''}
+                                        onChange={(e) => setProduct({ ...product, nazwa_pl: e.target.value })}
+                                        className="text-xl font-black text-choco-900 leading-tight uppercase tracking-tight bg-transparent border-b-2 border-transparent focus:border-gold-500 focus:outline-none transition-colors w-full resize-none"
+                                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', fieldSizing: 'content', overflow: 'hidden' }}
+                                        rows={1}
+                                        placeholder="Nazwa wyrobu..."
+                                    />
+                                    <div className="flex flex-nowrap gap-3 mt-0 items-stretch">
+                                        <div className="bg-choco-50 px-3 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
+                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">EAN Sztuka (Główny)</span>
                                             <input
                                                 type="text"
                                                 value={product.ean}
                                                 onChange={(e) => setProduct({ ...product, ean: e.target.value })}
-                                                className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none w-32"
+                                                className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none w-28"
                                                 placeholder="590..."
                                             />
                                         </div>
-                                        <div className="bg-choco-50 px-4 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
-                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1">EAN Karton</span>
+                                        <div className="bg-choco-50 px-3 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
+                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">EAN Karton</span>
                                             <input
                                                 type="text"
                                                 value={product.ean_karton || ''}
                                                 onChange={(e) => setProduct({ ...product, ean_karton: e.target.value })}
-                                                className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none w-32"
+                                                className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none w-28"
                                                 placeholder="590..."
                                             />
                                         </div>
-                                        <div className="bg-choco-100/30 px-4 py-2 rounded-2xl border border-dashed border-choco-200 flex flex-col opacity-60">
-                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1">Kod ID (Auto)</span>
+                                        <div className="bg-choco-100/30 px-3 py-2 rounded-2xl border border-dashed border-choco-200 flex flex-col opacity-60">
+                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">Kod ID (Auto)</span>
                                             <span className="text-sm font-bold text-choco-600 font-mono">{product.ean.slice(-6)}</span>
+                                        </div>
+                                        <div className="bg-choco-50 px-3 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
+                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">Kategoria</span>
+                                            <select
+                                                value={product.kategoria || ''}
+                                                onChange={(e) => setProduct({ ...product, kategoria: e.target.value })}
+                                                className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none cursor-pointer w-32"
+                                            >
+                                                <option value="">— wybierz —</option>
+                                                <option value="Wielkanoc">Wielkanoc</option>
+                                                <option value="Boże Narodzenie">Boże Narodzenie</option>
+                                                <option value="Dzień Dziecka">Dzień Dziecka</option>
+                                                <option value="Walentynki">Walentynki</option>
+                                                <option value="Halloween">Halloween</option>
+                                                <option value="Całoroczne">Całoroczne</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="p-2 hover:bg-choco-100 rounded-full text-choco-400 transition-colors"
+                                    className="p-2 hover:bg-choco-100 rounded-full text-choco-400 transition-colors flex-shrink-0"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -1266,38 +1314,49 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                 </div >
 
                 {/* Footer */}
-                < div className="p-6 border-t border-choco-100 grid grid-cols-2 gap-4 bg-white/80 backdrop-blur-xl" >
-                    <div className="grid grid-cols-3 gap-4">
-                        <button
-                            onClick={() => handleDownload('pl')}
-                            className="flex items-center justify-center gap-2 bg-choco-100 hover:bg-choco-200 text-choco-700 py-3 rounded-xl font-bold transition-all border border-choco-200 text-xs uppercase tracking-widest"
-                        >
-                            <FileDown className="w-4 h-4" />
-                            Eksport PL
-                        </button>
-                        <button
-                            onClick={handleDownloadPDFEn}
-                            className="flex items-center justify-center gap-2 bg-choco-100 hover:bg-choco-200 text-choco-700 py-3 rounded-xl font-bold transition-all border border-choco-200 text-xs uppercase tracking-widest"
-                        >
-                            <FileDown className="w-4 h-4" />
-                            Eksport EN PDF
-                        </button>
-                        <button
-                            onClick={handleDownloadPDF}
-                            className="flex items-center justify-center gap-2 bg-gold-600 hover:bg-gold-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-gold-600/20 text-xs uppercase tracking-widest"
-                        >
-                            <FileDown className="w-4 h-4" />
-                            EKSPORT PL PDF
-                        </button>
-                    </div>
+                <div className="px-6 py-4 border-t border-choco-100 flex items-center gap-2 bg-white/80 backdrop-blur-xl flex-wrap">
+                    {/* Export buttons — secondary, compact */}
+                    <button
+                        onClick={() => handleDownload('pl')}
+                        className="flex items-center gap-1.5 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                    >
+                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        Eksport PL
+                    </button>
+                    <button
+                        onClick={handleDownloadExcelEn}
+                        className="flex items-center gap-1.5 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                    >
+                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        Eksport EN
+                    </button>
+                    <button
+                        onClick={handleDownloadPDF}
+                        className="flex items-center gap-1.5 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                    >
+                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        Eksport PL PDF
+                    </button>
+                    <button
+                        onClick={handleDownloadPDFEn}
+                        className="flex items-center gap-1.5 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                    >
+                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        Eksport EN PDF
+                    </button>
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Primary save button */}
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center justify-center gap-2 bg-choco-800 hover:bg-choco-700 text-white py-3 rounded-xl font-bold transition-all shadow-xl shadow-choco-900/30 disabled:opacity-50 text-xs uppercase tracking-widest"
+                        className="flex items-center gap-2 bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-xl font-black transition-all shadow-xl shadow-choco-900/30 disabled:opacity-50 text-xs uppercase tracking-widest whitespace-nowrap shrink-0"
                     >
                         {saving ? 'Czekaj...' : <><Save className="w-4 h-4" /> Zapisz dane</>}
                     </button>
-                </div >
+                </div>
             </div >
         </div >
     )

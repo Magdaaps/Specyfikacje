@@ -61,13 +61,19 @@ def aggregate_allergens(produkt: models.Produkt):
             
     return allergens
 
-def generate_ingredients_text(produkt: models.Produkt, lang="pl"):
+def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=None):
     total_ingredients = {}
-    
+
+    def _t(name):
+        """Translate ingredient name when lang=en and translate_fn provided."""
+        if lang == "en" and translate_fn:
+            return translate_fn(name)
+        return name
+
     for s in produkt.skladniki:
         raw_material_percent = s.procent
         sklad_json = s.surowiec.sklad_procentowy
-        
+
         ingredients_found = False
         if sklad_json:
             try:
@@ -77,17 +83,21 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl"):
                         name = item.get('nazwa', '').strip()
                         if not name:
                             continue
+                        name = _t(name)
                         percent = float(item.get('procent', 0))
                         contribution = (percent / 100.0) * raw_material_percent
-                        
+
                         total_ingredients[name] = total_ingredients.get(name, 0) + contribution
                         ingredients_found = True
             except (json.JSONDecodeError, ValueError):
                 pass
-        
+
         if not ingredients_found:
             # Fallback to raw material name if no percentage breakdown is available
-            name = s.surowiec.nazwa if lang == "pl" else (s.surowiec.nazwa_en or s.surowiec.nazwa)
+            if lang == "en":
+                name = s.surowiec.nazwa_en or _t(s.surowiec.nazwa)
+            else:
+                name = s.surowiec.nazwa
             total_ingredients[name] = total_ingredients.get(name, 0) + raw_material_percent
 
     # Sort ingredients by percentage descending
@@ -100,13 +110,18 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl"):
         
     return ", ".join(parts)
 
-def get_ingredient_origins(produkt: models.Produkt):
+def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
     aggregation = {} # { name: { "percent": sum, "countries": set } }
+
+    def _t(name):
+        if translate_fn:
+            return translate_fn(name)
+        return name
 
     for s in produkt.skladniki:
         if not s.surowiec:
             continue
-            
+
         raw_material_percent = s.procent or 0.0
         sklad_json = s.surowiec.sklad_procentowy
         origins_json = s.surowiec.pochodzenie_skladnikow
@@ -118,8 +133,8 @@ def get_ingredient_origins(produkt: models.Produkt):
                 sklad_list = json.loads(sklad_json)
             except:
                 pass
-        
-        origins_dict = {} # { ingredient_name: [countries] }
+
+        origins_dict = {} # { ingredient_name_pl: [countries] }
         if origins_json:
             try:
                 origins_list = json.loads(origins_json)
@@ -131,7 +146,6 @@ def get_ingredient_origins(produkt: models.Produkt):
                          kraje = [k.strip() for k in kraje_raw.split(',') if k.strip()]
                     elif isinstance(kraje_raw, list):
                          kraje = [str(k).strip() for k in kraje_raw if str(k).strip()]
-                    
                     if name:
                         origins_dict[name] = kraje
             except:
@@ -139,32 +153,33 @@ def get_ingredient_origins(produkt: models.Produkt):
 
         if sklad_list and len(sklad_list) > 0:
             for item in sklad_list:
-                name = item.get('nazwa', '').strip()
-                if not name: continue
+                pl_name = item.get('nazwa', '').strip()
+                if not pl_name: continue
+                display_name = _t(pl_name)
                 percent = float(item.get('procent', 0))
                 contribution = (percent / 100.0) * raw_material_percent
 
-                if name not in aggregation:
-                    aggregation[name] = {"percent": 0.0, "countries": set()}
-                
-                aggregation[name]["percent"] += contribution
-                
-                # Add countries from origins_dict
-                countries = origins_dict.get(name, [])
+                if display_name not in aggregation:
+                    aggregation[display_name] = {"percent": 0.0, "countries": set()}
+
+                aggregation[display_name]["percent"] += contribution
+
+                # Countries are keyed by PL name in origins_dict
+                countries = origins_dict.get(pl_name, [])
                 for c in countries:
-                    aggregation[name]["countries"].add(c)
+                    aggregation[display_name]["countries"].add(c)
         else:
-            # Fallback to raw material name if no percentage breakdown is available
-            name = s.surowiec.nazwa
-            if name not in aggregation:
-                aggregation[name] = {"percent": 0.0, "countries": set()}
-            aggregation[name]["percent"] += raw_material_percent
-            
-            # If the raw material itself has a "kraj_pochodzenia" column
+            # Fallback to raw material name
+            pl_name = s.surowiec.nazwa
+            display_name = _t(pl_name)
+            if display_name not in aggregation:
+                aggregation[display_name] = {"percent": 0.0, "countries": set()}
+            aggregation[display_name]["percent"] += raw_material_percent
+
             if s.surowiec.kraj_pochodzenia:
                 kraje = [k.strip() for k in s.surowiec.kraj_pochodzenia.split(',') if k.strip()]
                 for c in kraje:
-                    aggregation[name]["countries"].add(c)
+                    aggregation[display_name]["countries"].add(c)
 
     # Convert to sorted list
     result = []

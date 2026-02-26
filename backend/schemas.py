@@ -71,6 +71,7 @@ class ProduktBase(BaseModel):
     prawna_nazwa_pl: Optional[str] = None
     prawna_nazwa_en: Optional[str] = None
     kategoria: Optional[str] = None
+    product_type: Optional[str] = "inne"
     masa_netto: Optional[str] = None
     image_url: Optional[str] = None
     

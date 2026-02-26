@@ -1,13 +1,80 @@
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from io import BytesIO
-import models, logic, json
+import models, logic, json, os
+
+# ---------------------------------------------------------------------------
+# Country name dictionary — direct PL → EN lookup from translations_en.json
+# ---------------------------------------------------------------------------
+def _load_country_map() -> dict:
+    try:
+        _path = os.path.join(os.path.dirname(__file__), "translations_en.json")
+        with open(_path, encoding="utf-8") as f:
+            return json.load(f).get("countries", {})
+    except Exception:
+        return {}
+
+_COUNTRY_MAP = _load_country_map()
+
+
+def _translate_country(name: str) -> str:
+    """Translate a single Polish country name to English using the dictionary."""
+    name = name.strip()
+    return _COUNTRY_MAP.get(name, name)
+
+
+# ---------------------------------------------------------------------------
+# Translation helpers — reuse the PDF translation engine (PL → EN).
+# Imported lazily to avoid circular-import issues at module load time.
+# ---------------------------------------------------------------------------
+def _make_translate_en():
+    """Return a translate_en(text) callable using the pdf_gen translation engine."""
+    try:
+        from pdf_gen import _translate_any_text, _apply_tech_dictionary
+        def _translate_en(text: str) -> str:
+            if not text:
+                return text
+            return _translate_any_text(_apply_tech_dictionary(str(text)))
+        return _translate_en
+    except Exception:
+        return lambda text: text  # fallback: no translation
+
+
+def _translate_product_name_excel(pl_name: str) -> str:
+    """Translate product name PL→EN using the dedicated product name translator from pdf_gen."""
+    if not pl_name:
+        return pl_name
+    try:
+        from pdf_gen import _translate_product_name
+        return _translate_product_name(pl_name)
+    except Exception:
+        return pl_name
+
 
 def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     wb = Workbook()
     ws = wb.active
     ws.title = "Specyfikacja Produktu" if lang == "pl" else "Product Specification"
-    
+
+    # Translation helper for EN mode
+    _t = _make_translate_en() if lang == "en" else (lambda x: x)
+
+    # Diagnostic log for EN export
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    if lang == "en":
+        _log.info(
+            f"[excel_gen EN] EAN={db_produkt.ean} | "
+            f"nazwa_pl={db_produkt.nazwa_pl!r} | "
+            f"nazwa_en={db_produkt.nazwa_en!r} | "
+            f"using={'nazwa_en' if db_produkt.nazwa_en else 'FALLBACK nazwa_pl'}"
+        )
+        if not db_produkt.nazwa_en:
+            _log.warning(
+                f"[excel_gen EN] EAN={db_produkt.ean}: nazwa_en is empty — "
+                f"using PL name as fallback. Fill in 'Nazwa EN' in the product card."
+            )
+
     # Styles
     header_font = Font(name='Arial', size=14, bold=True, color='FFFFFF')
     header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
@@ -24,11 +91,14 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     
     # Basic Info
     ws['A3'] = "Nazwa produktu:" if lang == "pl" else "Product Name:"
-    ws['B3'] = db_produkt.nazwa_pl if lang == "pl" else (db_produkt.nazwa_en or db_produkt.nazwa_pl)
+    ws['B3'] = db_produkt.nazwa_pl if lang == "pl" else (db_produkt.nazwa_en or _translate_product_name_excel(db_produkt.nazwa_pl or ""))
     
     ws['A4'] = "Nazwa prawna produktu / opis produktu:" if lang == "pl" else "Legal Name / Description:"
     ws.merge_cells('B4:D4')
-    ws['B4'] = db_produkt.prawna_nazwa_pl or "-"
+    if lang == "en":
+        ws['B4'] = db_produkt.prawna_nazwa_en or _t(db_produkt.prawna_nazwa_pl or "") or "-"
+    else:
+        ws['B4'] = db_produkt.prawna_nazwa_pl or "-"
     ws['B4'].alignment = Alignment(wrap_text=True)
     
     ws['A5'] = "Kod EAN / GTIN:"
@@ -88,7 +158,7 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     ws[f'A{row+1}'] = "SKŁAD" if lang == "pl" else "INGREDIENTS"
     ws[f'A{row+1}'].font = Font(bold=True, size=11)
     
-    sklad_text = logic.generate_ingredients_text(db_produkt, lang=lang)
+    sklad_text = logic.generate_ingredients_text(db_produkt, lang=lang, translate_fn=_t if lang == "en" else None)
     ws.merge_cells(f'A{row+2}:D{row+4}')
     ws[f'A{row+2}'] = sklad_text
     ws[f'A{row+2}'].alignment = Alignment(wrap_text=True, vertical='top')
@@ -110,11 +180,19 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     ws[f'C{row}'].font = Font(bold=True, size=9)
     row += 1
 
-    ingredient_origins = logic.get_ingredient_origins(db_produkt)
+    ingredient_origins = logic.get_ingredient_origins(db_produkt, translate_fn=_t if lang == "en" else None)
     for item in ingredient_origins:
         ws[f'A{row}'] = item['name']
         ws[f'B{row}'] = f"{str(round(item['percent'], 2)).replace('.', ',')}%"
-        ws[f'C{row}'] = ", ".join(item['countries']) if item['countries'] else "-"
+        countries = item['countries']
+        if lang == "en" and countries:
+            # Split each entry by comma (safety), translate each country individually
+            translated = []
+            for entry in countries:
+                for part in [p.strip() for p in entry.split(",") if p.strip()]:
+                    translated.append(_translate_country(part))
+            countries = translated
+        ws[f'C{row}'] = ", ".join(countries) if countries else "-"
         
         ws[f'A{row}'].font = Font(size=9)
         ws[f'B{row}'].font = Font(size=9)
@@ -135,11 +213,16 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     row += 1
     
     organo_fields = [
-        ("SMAK" if lang == "pl" else "TASTE", db_produkt.organoleptyka_smak),
-        ("ZAPACH" if lang == "pl" else "SMELL", db_produkt.organoleptyka_zapach),
-        ("KOLOR" if lang == "pl" else "COLOUR", db_produkt.organoleptyka_kolor),
-        ("WYGLĄD ZEWNĘTRZNY" if lang == "pl" else "EXTERNAL APPEARANCE", db_produkt.organoleptyka_wyglad_zewnetrzny),
-        ("WYGLĄD NA PRZEKROJU" if lang == "pl" else "CROSS-SECTION VIEW", db_produkt.organoleptyka_wyglad_na_przekroju)
+        ("SMAK" if lang == "pl" else "TASTE",
+         db_produkt.organoleptyka_smak if lang == "pl" else _t(db_produkt.organoleptyka_smak or "")),
+        ("ZAPACH" if lang == "pl" else "SMELL",
+         db_produkt.organoleptyka_zapach if lang == "pl" else _t(db_produkt.organoleptyka_zapach or "")),
+        ("KOLOR" if lang == "pl" else "COLOUR",
+         db_produkt.organoleptyka_kolor if lang == "pl" else _t(db_produkt.organoleptyka_kolor or "")),
+        ("WYGLĄD ZEWNĘTRZNY" if lang == "pl" else "EXTERNAL APPEARANCE",
+         db_produkt.organoleptyka_wyglad_zewnetrzny if lang == "pl" else _t(db_produkt.organoleptyka_wyglad_zewnetrzny or "")),
+        ("WYGLĄD NA PRZEKROJU" if lang == "pl" else "CROSS-SECTION VIEW",
+         db_produkt.organoleptyka_wyglad_na_przekroju if lang == "pl" else _t(db_produkt.organoleptyka_wyglad_na_przekroju or "")),
     ]
     
     for label, value in organo_fields:
@@ -153,10 +236,14 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     # Storage, Shelf Life and Additional Information
     row += 1
     new_sections = [
-        ("WARUNKI PRZECHOWYWANIA I TRANSPORTU" if lang == "pl" else "STORAGE AND TRANSPORT CONDITIONS", db_produkt.warunki_przechowywania),
-        ("TERMIN PRZYDATNOŚCI DO SPOŻYCIA" if lang == "pl" else "SHELF LIFE", db_produkt.termin_przydatnosci),
-        ("WYRAŻENIE I FORMAT" if lang == "pl" else "DATE EXPRESSION AND FORMAT", db_produkt.wyrazenie_format_daty),
-        ("INFORMACJE DODATKOWE" if lang == "pl" else "ADDITIONAL INFORMATION", db_produkt.informacje_dodatkowe)
+        ("WARUNKI PRZECHOWYWANIA I TRANSPORTU" if lang == "pl" else "STORAGE AND TRANSPORT CONDITIONS",
+         db_produkt.warunki_przechowywania if lang == "pl" else _t(db_produkt.warunki_przechowywania or "")),
+        ("TERMIN PRZYDATNOŚCI DO SPOŻYCIA" if lang == "pl" else "SHELF LIFE",
+         db_produkt.termin_przydatnosci if lang == "pl" else _t(db_produkt.termin_przydatnosci or "")),
+        ("WYRAŻENIE I FORMAT" if lang == "pl" else "DATE EXPRESSION AND FORMAT",
+         db_produkt.wyrazenie_format_daty if lang == "pl" else _t(db_produkt.wyrazenie_format_daty or "")),
+        ("INFORMACJE DODATKOWE" if lang == "pl" else "ADDITIONAL INFORMATION",
+         db_produkt.informacje_dodatkowe if lang == "pl" else _t(db_produkt.informacje_dodatkowe or ""))
     ]
     
     for label, value in new_sections:

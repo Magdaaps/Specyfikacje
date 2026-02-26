@@ -6,6 +6,7 @@ import {
   Settings,
   Search,
   Plus,
+  X,
   Download,
   Cloud,
   ChevronRight,
@@ -23,6 +24,59 @@ import logo from './assets/logo.png'
 
 const API_BASE = "http://127.0.0.1:8000"
 
+// Stała kolejność kategorii i ich polskie etykiety
+const PRODUCT_TYPE_ORDER = ['lizaki', 'figurki', 'tabliczki', 'inne']
+const PRODUCT_TYPE_LABELS = {
+  lizaki: 'Lizaki',
+  figurki: 'Figurki',
+  tabliczki: 'Tabliczki',
+  inne: 'Inne',
+}
+
+function ProductCard({ item, onClick }) {
+  return (
+    <div
+      onClick={() => onClick(item.ean)}
+      className="bg-white border border-choco-100 rounded-3xl overflow-hidden hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/15 transition-all group cursor-pointer shadow-sm flex flex-col"
+    >
+      {/* Image Section */}
+      <div className="aspect-[4/3] bg-choco-50/50 relative overflow-hidden flex items-center justify-center p-6">
+        <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+        <img
+          src={item.image_url ? `${API_BASE}${item.image_url}` : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
+          alt={item.nazwa_pl}
+          className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 z-20 drop-shadow-md"
+        />
+        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg z-30">
+          <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean.slice(-6)}</span>
+        </div>
+      </div>
+
+      {/* Content Section */}
+      <div className="p-6 flex flex-col flex-1">
+        <div className="flex-1">
+          <p className="text-gold-600 font-black text-[9px] uppercase tracking-[0.2em] mb-2">Specyfikacja Wyrobu</p>
+          <h3 className="font-bold text-lg text-choco-900 group-hover:text-choco-700 transition-colors uppercase tracking-tight leading-snug line-clamp-2 min-h-[3rem]">
+            {item.nazwa_pl}
+          </h3>
+        </div>
+
+        <div className="mt-6 pt-5 border-t border-choco-50 flex items-center justify-between gap-3">
+          <div className="flex flex-col min-w-0">
+            <span className="text-choco-300 uppercase tracking-widest text-[9px] font-bold">Kod EAN</span>
+            <span className="text-choco-700 font-mono font-bold text-xs tracking-wider">{item.ean}</span>
+          </div>
+          <div className="bg-choco-50 border border-choco-100 px-3 py-1.5 rounded-xl flex-shrink-0 max-w-[130px]">
+            <span className="text-[10px] font-black text-choco-500 uppercase tracking-wide block truncate whitespace-nowrap">
+              {item.kategoria || '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('produkty')
   const [produkty, setProdukty] = useState([])
@@ -31,6 +85,9 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [selectedProductEan, setSelectedProductEan] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [addModalProductType, setAddModalProductType] = useState('inne')
+  const [selectedProductType, setSelectedProductType] = useState('lizaki')
+  const [selectedKategoria, setSelectedKategoria] = useState('')
   const [showAddSurowiecModal, setShowAddSurowiecModal] = useState(false)
   const [editingSurowiec, setEditingSurowiec] = useState(null)
   const [notification, setNotification] = useState(null)
@@ -69,7 +126,7 @@ function App() {
     }
   }
 
-  // Categories calculation
+  // Categories calculation for surowce
   const categories = useMemo(() => {
     const cats = {}
     surowce.forEach(s => {
@@ -79,27 +136,47 @@ function App() {
     return Object.entries(cats).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
   }, [surowce])
 
-  const filteredItems = useMemo(() => {
-    if (activeTab === 'produkty') {
-      return produkty.filter(item =>
-        (item.nazwa_pl || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.ean || "").includes(searchTerm)
+  // Produkty grouped by product_type (for catalog view)
+  const produktyByType = useMemo(() => {
+    const groups = {}
+    PRODUCT_TYPE_ORDER.forEach(t => { groups[t] = [] })
+    produkty.forEach(p => {
+      const t = p.product_type || 'inne'
+      if (!groups[t]) groups[t] = []
+      groups[t].push(p)
+    })
+    return groups
+  }, [produkty])
+
+  // Filtered produkty for search
+  const filteredProdukty = useMemo(() => {
+    if (!searchTerm) return null
+    return produkty.filter(item =>
+      (item.nazwa_pl || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.ean || "").includes(searchTerm)
+    )
+  }, [produkty, searchTerm])
+
+  // Products in active tab, optionally filtered by kategoria
+  const filteredTabItems = useMemo(() => {
+    const base = produktyByType[selectedProductType] || []
+    if (!selectedKategoria) return base
+    return base.filter(p => (p.kategoria || '') === selectedKategoria)
+  }, [produktyByType, selectedProductType, selectedKategoria])
+
+  const filteredSurowce = useMemo(() => {
+    if (activeTab !== 'surowce') return []
+    if (searchTerm) {
+      return surowce.filter(item =>
+        (item.nazwa || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.kategoria || "").toLowerCase().includes(searchTerm.toLowerCase())
       )
-    } else {
-      // Global search for surowce
-      if (searchTerm) {
-        return surowce.filter(item =>
-          (item.nazwa || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.kategoria || "").toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      }
-      // Category view
-      if (selectedCategory) {
-        return surowce.filter(item => (item.kategoria || 'Inne') === selectedCategory)
-      }
-      return [] // When in categories view
     }
-  }, [activeTab, produkty, surowce, searchTerm, selectedCategory])
+    if (selectedCategory) {
+      return surowce.filter(item => (item.kategoria || 'Inne') === selectedCategory)
+    }
+    return []
+  }, [activeTab, surowce, searchTerm, selectedCategory])
 
   const handleAddCategory = () => {
     const name = prompt("Podaj nazwę nowej kategorii:")
@@ -108,6 +185,13 @@ function App() {
       setShowAddSurowiecModal(true)
     }
   }
+
+  const openAddProductModal = (productType = 'inne') => {
+    setAddModalProductType(productType)
+    setShowAddModal(true)
+  }
+
+  const totalProdukty = produkty.length
 
   return (
     <div className="flex h-screen bg-choco-50 text-choco-900 overflow-hidden font-sans">
@@ -177,13 +261,24 @@ function App() {
                 Dodaj kategorię
               </button>
             )}
-            <button
-              onClick={() => activeTab === 'produkty' ? setShowAddModal(true) : setShowAddSurowiecModal(true)}
-              className="bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg shadow-choco-900/30 transition-all transform hover:scale-105 active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              Dodaj {activeTab === 'produkty' ? 'Produkt' : 'Surowiec'}
-            </button>
+            {activeTab === 'produkty' && (
+              <button
+                onClick={() => openAddProductModal(searchTerm ? 'inne' : selectedProductType)}
+                className="bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg shadow-choco-900/30 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Dodaj Produkt
+              </button>
+            )}
+            {activeTab === 'surowce' && (
+              <button
+                onClick={() => setShowAddSurowiecModal(true)}
+                className="bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg shadow-choco-900/30 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Dodaj Surowiec
+              </button>
+            )}
           </div>
         </header>
 
@@ -212,7 +307,13 @@ function App() {
                 </div>
               </div>
               <div className="text-right text-choco-600 text-sm font-black">
-                {activeTab === 'produkty' || searchTerm || selectedCategory ? `${filteredItems.length} POZYCJI` : `${categories.length} KATEGORII`}
+                {activeTab === 'produkty'
+                  ? (searchTerm
+                    ? `${filteredProdukty.length} POZYCJI`
+                    : `${filteredTabItems.length} POZYCJI`)
+                  : (searchTerm || selectedCategory
+                    ? `${filteredSurowce.length} POZYCJI`
+                    : `${categories.length} KATEGORII`)}
               </div>
             </div>
 
@@ -228,7 +329,7 @@ function App() {
                 {searchTerm ? (
                   // Global Search Results
                   <div className="flex flex-col gap-2">
-                    {filteredItems.map(item => (
+                    {filteredSurowce.map(item => (
                       <div
                         key={item.id}
                         onClick={() => {
@@ -250,7 +351,7 @@ function App() {
                         <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
                       </div>
                     ))}
-                    {filteredItems.length === 0 && (
+                    {filteredSurowce.length === 0 && (
                       <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
                         <p className="text-choco-400 font-bold uppercase tracking-widest">Nie znaleziono surowców spełniających kryteria.</p>
                       </div>
@@ -259,7 +360,7 @@ function App() {
                 ) : selectedCategory ? (
                   // Items in specific category
                   <div className="flex flex-col gap-2">
-                    {filteredItems.map(item => (
+                    {filteredSurowce.map(item => (
                       <div
                         key={item.id}
                         onClick={() => {
@@ -279,7 +380,7 @@ function App() {
                         <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
                       </div>
                     ))}
-                    {filteredItems.length === 0 && (
+                    {filteredSurowce.length === 0 && (
                       <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
                         <p className="text-choco-400 font-bold uppercase tracking-widest">Brak surowców w tej kategorii.</p>
                       </div>
@@ -313,50 +414,110 @@ function App() {
                   </div>
                 )}
               </>
-            ) : (
-              // Produkty Catalog
+            ) : searchTerm ? (
+              // ---- SEARCH RESULTS (flat grid) ----
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {filteredItems.map(item => (
-                  <div
-                    key={item.ean}
-                    onClick={() => setSelectedProductEan(item.ean)}
-                    className="bg-white border border-choco-100 rounded-3xl overflow-hidden hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/15 transition-all group cursor-pointer shadow-sm flex flex-col"
-                  >
-                    {/* Image Section */}
-                    <div className="aspect-[4/3] bg-choco-50/50 relative overflow-hidden flex items-center justify-center p-6">
-                      <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
-                      <img
-                        src={item.image_url ? `${API_BASE}${item.image_url}` : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
-                        alt={item.nazwa_pl}
-                        className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 z-20 drop-shadow-md"
-                      />
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg z-30">
-                        <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean.slice(-6)}</span>
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="p-6 flex flex-col flex-1">
-                      <div className="flex-1">
-                        <p className="text-gold-600 font-black text-[9px] uppercase tracking-[0.2em] mb-2">Specyfikacja Wyrobu</p>
-                        <h3 className="font-bold text-lg text-choco-900 group-hover:text-choco-700 transition-colors uppercase tracking-tight leading-snug line-clamp-2 min-h-[3rem]">
-                          {item.nazwa_pl}
-                        </h3>
-                      </div>
-
-                      <div className="mt-6 pt-5 border-t border-choco-50 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-choco-300 uppercase tracking-widest text-[9px] font-bold">Kod EAN</span>
-                          <span className="text-choco-700 font-mono font-bold text-xs tracking-wider">{item.ean}</span>
-                        </div>
-                        <div className="bg-choco-50 p-2 rounded-xl text-choco-400 group-hover:bg-gold-500 group-hover:text-white transition-all shadow-inner">
-                          <Package className="w-5 h-5" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                {filteredProdukty.map(item => (
+                  <ProductCard key={item.ean} item={item} onClick={setSelectedProductEan} />
                 ))}
+                {filteredProdukty.length === 0 && (
+                  <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
+                    <p className="text-choco-400 font-bold uppercase tracking-widest">Nie znaleziono produktów.</p>
+                  </div>
+                )}
               </div>
+            ) : (
+              // ---- TABS CATALOG ----
+              <>
+                {/* Tab bar + kategoria filter */}
+                <div className="flex flex-wrap items-center gap-3 mb-8">
+                  {/* Type tabs */}
+                  <div className="flex items-center gap-1 bg-white border border-choco-100 rounded-2xl p-1.5 shadow-sm">
+                    {PRODUCT_TYPE_ORDER.map(typeKey => {
+                      const count = (produktyByType[typeKey] || []).length
+                      const isActive = selectedProductType === typeKey
+                      return (
+                        <button
+                          key={typeKey}
+                          onClick={() => {
+                            setSelectedProductType(typeKey)
+                            setSelectedKategoria('')
+                          }}
+                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all ${
+                            isActive
+                              ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/20'
+                              : 'text-choco-400 hover:text-choco-700 hover:bg-choco-50'
+                          }`}
+                        >
+                          {PRODUCT_TYPE_LABELS[typeKey]}
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                            isActive ? 'bg-white/20 text-white' : 'bg-choco-100 text-choco-400'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Kategoria filter — styled to match the type tabs pill */}
+                  <div className={`flex items-center gap-1 bg-white border rounded-2xl p-1.5 shadow-sm transition-all ${
+                    selectedKategoria ? 'border-gold-400' : 'border-choco-100'
+                  }`}>
+                    <select
+                      value={selectedKategoria}
+                      onChange={(e) => setSelectedKategoria(e.target.value)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider focus:outline-none cursor-pointer transition-all appearance-none ${
+                        selectedKategoria
+                          ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/20'
+                          : 'bg-transparent text-choco-400 hover:text-choco-700'
+                      }`}
+                    >
+                      <option value="">Wszystkie kategorie</option>
+                      <option value="Wielkanoc">Wielkanoc</option>
+                      <option value="Boże Narodzenie">Boże Narodzenie</option>
+                      <option value="Dzień Dziecka">Dzień Dziecka</option>
+                      <option value="Walentynki">Walentynki</option>
+                      <option value="Halloween">Halloween</option>
+                      <option value="Całoroczne">Całoroczne</option>
+                    </select>
+                    {selectedKategoria && (
+                      <button
+                        onClick={() => setSelectedKategoria('')}
+                        className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all"
+                        title="Wyczyść filtr"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Products grid for active tab */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                  {filteredTabItems.map(item => (
+                    <ProductCard key={item.ean} item={item} onClick={setSelectedProductEan} />
+                  ))}
+                  {filteredTabItems.length === 0 && (
+                    <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
+                      <p className="text-choco-400 font-bold uppercase tracking-widest mb-4">
+                        {selectedKategoria
+                          ? `Brak produktów „${PRODUCT_TYPE_LABELS[selectedProductType]}" w kategorii „${selectedKategoria}".`
+                          : `Brak produktów w kategorii „${PRODUCT_TYPE_LABELS[selectedProductType]}".`}
+                      </p>
+                      {!selectedKategoria && (
+                        <button
+                          onClick={() => openAddProductModal(selectedProductType)}
+                          className="inline-flex items-center gap-2 text-sm font-semibold text-choco-500 hover:text-choco-800 border border-choco-200 hover:border-choco-400 bg-white hover:bg-choco-50 px-5 py-2.5 rounded-full transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Dodaj pierwszy produkt
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </section>
@@ -372,6 +533,7 @@ function App() {
 
         {showAddModal && (
           <AddProductModal
+            initialProductType={addModalProductType}
             onClose={() => setShowAddModal(false)}
             onRefresh={fetchData}
             notify={(msg, type) => setNotification({ message: msg, type })}
