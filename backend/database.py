@@ -1,20 +1,21 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
-# Get absolute path for the database file (pointing to the root folder where data was found)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-db_path = os.path.join(BASE_DIR, "product_generator.db")
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_path}"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-print(f"DEBUG: Database path is {db_path}")
+if DATABASE_URL:
+    # Supabase/Render zwracają postgres://, SQLAlchemy wymaga postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.path.join(BASE_DIR, "product_generator.db")
+    DATABASE_URL = f"sqlite:///{db_path}"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}, echo=True
-)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 def get_db():
