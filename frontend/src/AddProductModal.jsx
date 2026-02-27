@@ -85,7 +85,7 @@ export default function AddProductModal({ onClose, onRefresh, notify, initialPro
                                 className="aspect-[3/4] rounded-2xl border-2 border-dashed border-choco-100 bg-choco-50/30 flex flex-col items-center justify-center cursor-pointer hover:border-gold-500/50 hover:bg-choco-50 transition-all overflow-hidden group"
                             >
                                 {formData.image_url ? (
-                                    <img src={`${API_BASE}${formData.image_url}`} alt="Podgląd" className="w-full h-full object-cover" />
+                                    <img src={formData.image_url.startsWith('http') ? formData.image_url : `${API_BASE}${formData.image_url}`} alt="Podgląd" className="w-full h-full object-cover" />
                                 ) : (
                                     <>
                                         <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-choco-300 group-hover:text-gold-600 transition-colors shadow-sm mb-3">

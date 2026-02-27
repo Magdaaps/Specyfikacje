@@ -43,7 +43,7 @@ function ProductCard({ item, onClick }) {
       <div className="aspect-[4/3] bg-choco-50/50 relative overflow-hidden flex items-center justify-center p-6">
         <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
         <img
-          src={item.image_url ? `${API_BASE}${item.image_url}` : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
+          src={item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE}${item.image_url}`) : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
           alt={item.nazwa_pl}
           className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 z-20 drop-shadow-md"
         />

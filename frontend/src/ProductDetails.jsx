@@ -423,7 +423,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                             className="w-32 h-32 rounded-2xl bg-choco-50 border border-choco-100 overflow-hidden group cursor-pointer relative shadow-md shrink-0"
                         >
                             {product.image_url ? (
-                                <img src={`${API_BASE}${product.image_url}`} alt={product.nazwa_pl} className="w-full h-full object-cover" />
+                                <img src={product.image_url.startsWith('http') ? product.image_url : `${API_BASE}${product.image_url}`} alt={product.nazwa_pl} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-choco-300">
                                     <Camera size={32} />
