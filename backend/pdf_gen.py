@@ -605,19 +605,25 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
     # Product image
     product_image_html = ""
     if produkt.image_url:
-        img_relative = produkt.image_url.lstrip("/")
-        img_abs_path = os.path.join(base_dir, img_relative)
-        if os.path.exists(img_abs_path):
-            try:
-                import base64 as _b64, mimetypes as _mt
-                with open(img_abs_path, "rb") as _f:
+        try:
+            import base64 as _b64, mimetypes as _mt, urllib.request as _req
+            _img_url = produkt.image_url
+            if _img_url.startswith("http://") or _img_url.startswith("https://"):
+                # Cloud storage URL (Supabase etc.)
+                with _req.urlopen(_img_url, timeout=10) as _resp:
+                    _img_data = _resp.read()
+                _img_mime = _mt.guess_type(_img_url)[0] or "image/jpeg"
+            else:
+                # Local filesystem fallback (development)
+                _img_abs = os.path.join(base_dir, _img_url.lstrip("/"))
+                with open(_img_abs, "rb") as _f:
                     _img_data = _f.read()
-                _img_mime = _mt.guess_type(img_abs_path)[0] or "image/jpeg"
-                _img_b64 = _b64.b64encode(_img_data).decode()
-                _img_src = f"data:{_img_mime};base64,{_img_b64}"
-                product_image_html = f'<div style="text-align: center; margin-top: 15pt; margin-bottom: 15pt;"><img src="{_img_src}" style="max-width: 200pt; max-height: 200pt;"></div>'
-            except Exception as _e:
-                logger.warning("Could not embed product image: %s", _e)
+                _img_mime = _mt.guess_type(_img_abs)[0] or "image/jpeg"
+            _img_b64 = _b64.b64encode(_img_data).decode()
+            _img_src = f"data:{_img_mime};base64,{_img_b64}"
+            product_image_html = f'<div style="text-align: center; margin-top: 15pt; margin-bottom: 15pt;"><img src="{_img_src}" style="max-width: 200pt; max-height: 200pt;"></div>'
+        except Exception as _e:
+            logger.warning("Could not embed product image: %s", _e)
 
     _register_fonts()
 

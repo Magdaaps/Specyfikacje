@@ -299,13 +299,39 @@ def download_pdf(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
         raise exceptions.AppError(f"Failed to generate PDF file: {str(e)}")
 
 # --- UPLOAD ---
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE_BUCKET = "product-images"
+
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    return {"url": f"/uploads/{file.filename}"}
+
+    content = await file.read()
+
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        import httpx
+        storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file.filename}"
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                storage_url,
+                content=content,
+                headers={
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": file.content_type or "application/octet-stream",
+                    "x-upsert": "true",
+                },
+            )
+        if resp.status_code not in (200, 201):
+            logger.error(f"Supabase Storage upload failed: {resp.status_code} {resp.text}")
+            raise HTTPException(status_code=500, detail="Image upload to cloud storage failed")
+        public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file.filename}"
+        logger.info(f"Image uploaded to Supabase Storage: {public_url}")
+        return {"url": public_url}
+    else:
+        # Fallback: local filesystem (development)
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        return {"url": f"/uploads/{file.filename}"}

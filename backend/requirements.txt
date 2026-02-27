@@ -10,3 +10,4 @@ python-dotenv
 xhtml2pdf
 python-bidi==0.6.6
 psycopg2-binary
+httpx
