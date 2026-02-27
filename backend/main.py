@@ -309,3 +309,8 @@ async def upload_image(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
     
     return {"url": f"/uploads/{file.filename}"}
+
+# Serve React frontend (must be last)
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
