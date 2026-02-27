@@ -281,8 +281,9 @@ def _status_to_css_class(status: str) -> str:
     return "other"
 
 
-FONT_REGULAR = "C:/Windows/Fonts/arial.ttf"
-FONT_BOLD = "C:/Windows/Fonts/arialbd.ttf"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_REGULAR = os.path.join(_BASE_DIR, "fonts", "arial.ttf")
+FONT_BOLD = os.path.join(_BASE_DIR, "fonts", "arialbd.ttf")
 
 _fonts_registered = False
 
