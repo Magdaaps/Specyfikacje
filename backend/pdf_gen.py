@@ -606,10 +606,18 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
     product_image_html = ""
     if produkt.image_url:
         img_relative = produkt.image_url.lstrip("/")
-        img_abs_path = os.path.join(base_dir, img_relative).replace("\\", "/")
+        img_abs_path = os.path.join(base_dir, img_relative)
         if os.path.exists(img_abs_path):
-            img_uri = "file:///" + img_abs_path
-            product_image_html = f'<div style="text-align: center; margin-top: 15pt; margin-bottom: 15pt;"><img src="{img_uri}" style="max-width: 200pt; max-height: 200pt;"></div>'
+            try:
+                import base64 as _b64, mimetypes as _mt
+                with open(img_abs_path, "rb") as _f:
+                    _img_data = _f.read()
+                _img_mime = _mt.guess_type(img_abs_path)[0] or "image/jpeg"
+                _img_b64 = _b64.b64encode(_img_data).decode()
+                _img_src = f"data:{_img_mime};base64,{_img_b64}"
+                product_image_html = f'<div style="text-align: center; margin-top: 15pt; margin-bottom: 15pt;"><img src="{_img_src}" style="max-width: 200pt; max-height: 200pt;"></div>'
+            except Exception as _e:
+                logger.warning("Could not embed product image: %s", _e)
 
     _register_fonts()
 
