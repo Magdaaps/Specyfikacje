@@ -96,6 +96,14 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState(null)
 
   useEffect(() => {
+    // Keep Render backend alive (free tier sleeps after 15 min inactivity)
+    const keepAlive = () => axios.get(`${API_BASE}/`).catch(() => {})
+    keepAlive()
+    const timer = setInterval(keepAlive, 9 * 60 * 1000) // every 9 min
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
     // Setup Axios Interceptor
     const interceptor = axios.interceptors.response.use(
       response => response,
