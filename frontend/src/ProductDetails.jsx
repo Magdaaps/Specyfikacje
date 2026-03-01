@@ -67,6 +67,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     const [availableSurowce, setAvailableSurowce] = useState([])
     const [showAddMenu, setShowAddMenu] = useState(false)
     const [suggestions, setSuggestions] = useState({})
+    const [imgHeaderFailed, setImgHeaderFailed] = useState(false)
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
 
@@ -422,8 +423,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                             onClick={() => document.getElementById('image-upload').click()}
                             className="w-32 h-32 rounded-2xl bg-choco-50 border border-choco-100 overflow-hidden group cursor-pointer relative shadow-md shrink-0"
                         >
-                            {product.image_url ? (
-                                <img src={product.image_url.startsWith('http') ? product.image_url : `${API_BASE}${product.image_url}`} alt={product.nazwa_pl} className="w-full h-full object-cover" />
+                            {product.image_url && !imgHeaderFailed ? (
+                                <img
+                                    src={product.image_url.startsWith('http') ? product.image_url : `${API_BASE}${product.image_url}`}
+                                    alt={product.nazwa_pl}
+                                    className="w-full h-full object-cover"
+                                    onError={() => setImgHeaderFailed(true)}
+                                />
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-choco-300">
                                     <Camera size={32} />
@@ -446,6 +452,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                         const res = await axios.post(`${API_BASE}/upload`, formData)
                                         const newUrl = res.data.url
                                         setProduct({ ...product, image_url: newUrl })
+                                        setImgHeaderFailed(false)
                                         // Auto-save image_url immediately so it persists without requiring Save
                                         await axios.patch(`${API_BASE}/produkty/${product.ean}/image`, { image_url: newUrl })
                                         notify("Zdjęcie zaktualizowane i zapisane!", "success")

@@ -34,19 +34,37 @@ const PRODUCT_TYPE_LABELS = {
 }
 
 function ProductCard({ item, onClick }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const imageUrl = item.image_url
+    ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE}${item.image_url}`)
+    : null
+  const showImage = imageUrl && !imgFailed
+
   return (
     <div
       onClick={() => onClick(item.ean)}
       className="bg-white border border-choco-100 rounded-3xl overflow-hidden hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/15 transition-all group cursor-pointer shadow-sm flex flex-col"
     >
       {/* Image Section */}
-      <div className="aspect-[4/3] bg-choco-50/50 relative overflow-hidden flex items-center justify-center p-6">
-        <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
-        <img
-          src={item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE}${item.image_url}`) : `https://placehold.co/600x400/7d5c4f/ffffff?text=${encodeURIComponent(item.nazwa_pl)}`}
-          alt={item.nazwa_pl}
-          className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 z-20 drop-shadow-md"
-        />
+      <div className="aspect-[4/3] relative overflow-hidden">
+        {showImage ? (
+          <>
+            <div className="absolute inset-0 bg-choco-50/50" />
+            <div className="absolute inset-0 bg-gradient-to-t from-choco-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+            <div className="absolute inset-0 flex items-center justify-center p-6 z-20">
+              <img
+                src={imageUrl}
+                alt={item.nazwa_pl}
+                className="max-w-full max-h-full object-contain transform group-hover:scale-105 transition-transform duration-500 drop-shadow-md"
+                onError={() => setImgFailed(true)}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center p-5" style={{ background: '#7d5c4f' }}>
+            <span className="text-white text-xs font-semibold text-center leading-relaxed line-clamp-4">{item.nazwa_pl}</span>
+          </div>
+        )}
         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg z-30">
           <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean.slice(-6)}</span>
         </div>
