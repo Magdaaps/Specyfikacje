@@ -1,6 +1,6 @@
 import logging
 import time
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response, File, UploadFile, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -104,6 +104,16 @@ def read_produkty(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 def update_produkt(ean: str, produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
     logger.info(f"DB: UPDATING PRODUCT (PUT) EAN: {ean}")
     return crud.update_produkt(db=db, ean=ean, produkt=produkt)
+
+@app.patch("/produkty/{ean}/image")
+def update_product_image(ean: str, image_url: Optional[str] = Body(None, embed=True), db: Session = Depends(get_db)):
+    db_produkt = crud.get_produkt(db, ean=ean)
+    if db_produkt is None:
+        raise HTTPException(status_code=404, detail="Produkt not found")
+    db_produkt.image_url = image_url
+    db.commit()
+    logger.info(f"Image URL updated for EAN {ean}: {image_url}")
+    return {"image_url": db_produkt.image_url}
 
 @app.get("/produkty/{ean}", response_model=schemas.Produkt)
 def read_produkt(ean: str, db: Session = Depends(get_db)):

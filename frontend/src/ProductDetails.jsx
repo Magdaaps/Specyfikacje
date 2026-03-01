@@ -444,8 +444,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                     formData.append('file', file)
                                     try {
                                         const res = await axios.post(`${API_BASE}/upload`, formData)
-                                        setProduct({ ...product, image_url: res.data.url })
-                                        notify("Zdjęcie zaktualizowane!", "success")
+                                        const newUrl = res.data.url
+                                        setProduct({ ...product, image_url: newUrl })
+                                        // Auto-save image_url immediately so it persists without requiring Save
+                                        await axios.patch(`${API_BASE}/produkty/${product.ean}/image`, { image_url: newUrl })
+                                        notify("Zdjęcie zaktualizowane i zapisane!", "success")
                                     } catch (err) {
                                         notify("Błąd przesyłania", "error")
                                     }
