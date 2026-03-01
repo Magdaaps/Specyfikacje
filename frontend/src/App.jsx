@@ -115,7 +115,7 @@ function App() {
 
   useEffect(() => {
     // Keep Render backend alive (free tier sleeps after 15 min inactivity)
-    const keepAlive = () => axios.get(`${API_BASE}/`).catch(() => {})
+    const keepAlive = () => axios.get(`${API_BASE}/`).catch(() => { })
     keepAlive()
     const timer = setInterval(keepAlive, 9 * 60 * 1000) // every 9 min
     return () => clearInterval(timer)
@@ -143,8 +143,8 @@ function App() {
     try {
       const endpoint = activeTab === 'produkty' ? '/produkty' : '/surowce'
       const res = await axios.get(`${API_BASE}${endpoint}`)
-      if (activeTab === 'produkty') setProdukty(res.data)
-      else setSurowce(res.data)
+      if (activeTab === 'produkty') setProdukty(Array.isArray(res.data) ? res.data : [])
+      else setSurowce(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       console.error("Error fetching data:", err)
     } finally {
@@ -469,16 +469,14 @@ function App() {
                             setSelectedProductType(typeKey)
                             setSelectedKategoria('')
                           }}
-                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all ${
-                            isActive
+                          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all ${isActive
                               ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/20'
                               : 'text-choco-400 hover:text-choco-700 hover:bg-choco-50'
-                          }`}
+                            }`}
                         >
                           {PRODUCT_TYPE_LABELS[typeKey]}
-                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                            isActive ? 'bg-white/20 text-white' : 'bg-choco-100 text-choco-400'
-                          }`}>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-choco-100 text-choco-400'
+                            }`}>
                             {count}
                           </span>
                         </button>
@@ -487,17 +485,15 @@ function App() {
                   </div>
 
                   {/* Kategoria filter — styled to match the type tabs pill */}
-                  <div className={`flex items-center gap-1 bg-white border rounded-2xl p-1.5 shadow-sm transition-all ${
-                    selectedKategoria ? 'border-gold-400' : 'border-choco-100'
-                  }`}>
+                  <div className={`flex items-center gap-1 bg-white border rounded-2xl p-1.5 shadow-sm transition-all ${selectedKategoria ? 'border-gold-400' : 'border-choco-100'
+                    }`}>
                     <select
                       value={selectedKategoria}
                       onChange={(e) => setSelectedKategoria(e.target.value)}
-                      className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider focus:outline-none cursor-pointer transition-all appearance-none ${
-                        selectedKategoria
+                      className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider focus:outline-none cursor-pointer transition-all appearance-none ${selectedKategoria
                           ? 'bg-choco-800 text-white shadow-lg shadow-choco-900/20'
                           : 'bg-transparent text-choco-400 hover:text-choco-700'
-                      }`}
+                        }`}
                     >
                       <option value="">Wszystkie kategorie</option>
                       <option value="Wielkanoc">Wielkanoc</option>
