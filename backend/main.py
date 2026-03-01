@@ -323,19 +323,26 @@ async def upload_image(file: UploadFile = File(...)):
     if SUPABASE_URL and SUPABASE_SERVICE_KEY:
         import httpx
         storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file.filename}"
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                storage_url,
-                content=content,
-                headers={
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                    "Content-Type": file.content_type or "application/octet-stream",
-                    "x-upsert": "true",
-                },
-            )
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    storage_url,
+                    content=content,
+                    headers={
+                        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                        "Content-Type": file.content_type or "application/octet-stream",
+                        "x-upsert": "true",
+                    },
+                )
+        except httpx.TimeoutException:
+            logger.error("Supabase Storage upload timed out")
+            raise HTTPException(status_code=500, detail="Przekroczono czas połączenia z Supabase Storage")
+        except httpx.RequestError as e:
+            logger.error(f"Supabase Storage connection error: {e}")
+            raise HTTPException(status_code=500, detail=f"Błąd połączenia z Supabase Storage: {e}")
         if resp.status_code not in (200, 201):
             logger.error(f"Supabase Storage upload failed: {resp.status_code} {resp.text}")
-            raise HTTPException(status_code=500, detail="Image upload to cloud storage failed")
+            raise HTTPException(status_code=500, detail=f"Supabase Storage odmówił uploadu ({resp.status_code}): {resp.text[:200]}")
         public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file.filename}"
         logger.info(f"Image uploaded to Supabase Storage: {public_url}")
         return {"url": public_url}

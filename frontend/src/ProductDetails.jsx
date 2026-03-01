@@ -457,7 +457,9 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                         await axios.patch(`${API_BASE}/produkty/${product.ean}/image`, { image_url: newUrl })
                                         notify("Zdjęcie zaktualizowane i zapisane!", "success")
                                     } catch (err) {
-                                        notify("Błąd przesyłania", "error")
+                                        const detail = err.response?.data?.detail || err.message || "Nieznany błąd"
+                                        notify(`Błąd przesyłania: ${detail}`, "error")
+                                        console.error("Upload error:", err.response?.data, err.message)
                                     }
                                 }}
                             />
