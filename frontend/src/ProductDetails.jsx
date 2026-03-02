@@ -288,6 +288,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
 
     const handleSave = async () => {
         setSaving(true)
+        const n = (v) => { const x = parseFloat(v); return isNaN(x) ? 0 : x }
+        const ni = (v) => { const x = parseInt(v); return isNaN(x) ? 0 : x }
         try {
             const payload = {
                 ean: product.ean,
@@ -318,35 +320,35 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                 kod_cn: product.kod_cn,
                 kod_pkwiu: product.kod_pkwiu,
                 certyfikaty: typeof product.certyfikaty === 'string' ? product.certyfikaty : JSON.stringify(product.certyfikaty || []),
-                logistyka_wymiary_solo_h: product.logistyka_wymiary_solo_h,
-                logistyka_wymiary_solo_w: product.logistyka_wymiary_solo_w,
-                logistyka_wymiary_solo_d: product.logistyka_wymiary_solo_d,
-                logistyka_wymiary_jednostka_h: product.logistyka_wymiary_jednostka_h,
-                logistyka_wymiary_jednostka_w: product.logistyka_wymiary_jednostka_w,
-                logistyka_wymiary_jednostka_d: product.logistyka_wymiary_jednostka_d,
-                logistyka_wymiary_zbiorcze1_h: product.logistyka_wymiary_zbiorcze1_h,
-                logistyka_wymiary_zbiorcze1_w: product.logistyka_wymiary_zbiorcze1_w,
-                logistyka_wymiary_zbiorcze1_d: product.logistyka_wymiary_zbiorcze1_d,
-                logistyka_wymiary_zbiorcze2_h: product.logistyka_wymiary_zbiorcze2_h,
-                logistyka_wymiary_zbiorcze2_w: product.logistyka_wymiary_zbiorcze2_w,
-                logistyka_wymiary_zbiorcze2_d: product.logistyka_wymiary_zbiorcze2_d,
-                logistyka_wymiary_zbiorcze3_h: product.logistyka_wymiary_zbiorcze3_h,
-                logistyka_wymiary_zbiorcze3_w: product.logistyka_wymiary_zbiorcze3_w,
-                logistyka_wymiary_zbiorcze3_d: product.logistyka_wymiary_zbiorcze3_d,
+                logistyka_wymiary_solo_h: n(product.logistyka_wymiary_solo_h),
+                logistyka_wymiary_solo_w: n(product.logistyka_wymiary_solo_w),
+                logistyka_wymiary_solo_d: n(product.logistyka_wymiary_solo_d),
+                logistyka_wymiary_jednostka_h: n(product.logistyka_wymiary_jednostka_h),
+                logistyka_wymiary_jednostka_w: n(product.logistyka_wymiary_jednostka_w),
+                logistyka_wymiary_jednostka_d: n(product.logistyka_wymiary_jednostka_d),
+                logistyka_wymiary_zbiorcze1_h: n(product.logistyka_wymiary_zbiorcze1_h),
+                logistyka_wymiary_zbiorcze1_w: n(product.logistyka_wymiary_zbiorcze1_w),
+                logistyka_wymiary_zbiorcze1_d: n(product.logistyka_wymiary_zbiorcze1_d),
+                logistyka_wymiary_zbiorcze2_h: n(product.logistyka_wymiary_zbiorcze2_h),
+                logistyka_wymiary_zbiorcze2_w: n(product.logistyka_wymiary_zbiorcze2_w),
+                logistyka_wymiary_zbiorcze2_d: n(product.logistyka_wymiary_zbiorcze2_d),
+                logistyka_wymiary_zbiorcze3_h: n(product.logistyka_wymiary_zbiorcze3_h),
+                logistyka_wymiary_zbiorcze3_w: n(product.logistyka_wymiary_zbiorcze3_w),
+                logistyka_wymiary_zbiorcze3_d: n(product.logistyka_wymiary_zbiorcze3_d),
                 logistyka_rodzaj_palety: product.logistyka_rodzaj_palety,
-                logistyka_waga_netto_szt: product.logistyka_waga_netto_szt,
-                logistyka_waga_brutto_szt: product.logistyka_waga_brutto_szt,
-                logistyka_waga_netto_zbiorcze: product.logistyka_waga_netto_zbiorcze,
-                logistyka_waga_brutto_zbiorcze: product.logistyka_waga_brutto_zbiorcze,
-                logistyka_waga_netto_paleta: product.logistyka_waga_netto_paleta,
-                logistyka_waga_brutto_paleta: product.logistyka_waga_brutto_paleta,
-                logistyka_sztuk_w_zbiorczym: product.logistyka_sztuk_w_zbiorczym,
-                logistyka_kartonow_na_warstwie: product.logistyka_kartonow_na_warstwie,
-                logistyka_warstw_na_palecie: product.logistyka_warstw_na_palecie,
-                logistyka_kartonow_na_palecie: product.logistyka_kartonow_na_palecie,
-                logistyka_sztuk_na_palecie: product.logistyka_sztuk_na_palecie,
-                logistyka_sztuk_na_warstwie: product.logistyka_sztuk_na_warstwie,
-                logistyka_wysokosc_palety: product.logistyka_wysokosc_palety
+                logistyka_waga_netto_szt: n(product.logistyka_waga_netto_szt),
+                logistyka_waga_brutto_szt: n(product.logistyka_waga_brutto_szt),
+                logistyka_waga_netto_zbiorcze: n(product.logistyka_waga_netto_zbiorcze),
+                logistyka_waga_brutto_zbiorcze: n(product.logistyka_waga_brutto_zbiorcze),
+                logistyka_waga_netto_paleta: n(product.logistyka_waga_netto_paleta),
+                logistyka_waga_brutto_paleta: n(product.logistyka_waga_brutto_paleta),
+                logistyka_sztuk_w_zbiorczym: ni(product.logistyka_sztuk_w_zbiorczym),
+                logistyka_kartonow_na_warstwie: ni(product.logistyka_kartonow_na_warstwie),
+                logistyka_warstw_na_palecie: ni(product.logistyka_warstw_na_palecie),
+                logistyka_kartonow_na_palecie: ni(product.logistyka_kartonow_na_palecie),
+                logistyka_sztuk_na_palecie: ni(product.logistyka_sztuk_na_palecie),
+                logistyka_sztuk_na_warstwie: ni(product.logistyka_sztuk_na_warstwie),
+                logistyka_wysokosc_palety: n(product.logistyka_wysokosc_palety)
             }
             await axios.put(`${API_BASE}/produkty/${ean}`, payload)
             notify("Zmiany zostały zapisane pomyślnie!", 'success')
