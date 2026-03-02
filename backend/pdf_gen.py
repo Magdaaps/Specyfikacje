@@ -114,6 +114,13 @@ _TECH_TERMS: list[tuple[str, str]] = [
     ("masa o smaku mlecznym",            "milk-flavoured compound chocolate"),
     ("dla masy",  "for compound chocolate"),
     ("dla mas",   "for compound chocolate"),
+    # Cocoa mass – must come BEFORE generic "masy" to avoid "compound chocolate" mismatch
+    ("zawartość masy kakaowej",  "cocoa mass content"),
+    ("masy kakaowej",            "cocoa mass"),
+    ("masę kakaową",             "cocoa mass"),
+    ("masą kakaową",             "cocoa mass"),
+    ("masie kakaowej",           "cocoa mass"),
+    ("masa kakaowa",             "cocoa mass"),
     # Single-word inflected forms (lowercase; IGNORECASE covers Masy/MASY etc.)
     ("masy",   "compound chocolate"),
     ("masą",   "compound chocolate"),
