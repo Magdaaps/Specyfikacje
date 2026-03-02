@@ -42,7 +42,7 @@ function ProductCard({ item, onClick }) {
 
   return (
     <div
-      onClick={() => onClick(item.ean)}
+      onClick={() => onClick(item.ean || '~')}
       className="bg-white border border-choco-100 rounded-3xl overflow-hidden hover:border-gold-500/50 hover:shadow-2xl hover:shadow-choco-900/15 transition-all group cursor-pointer shadow-sm flex flex-col"
     >
       {/* Image Section */}
@@ -66,7 +66,7 @@ function ProductCard({ item, onClick }) {
           </div>
         )}
         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg z-30">
-          <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean.slice(-6)}</span>
+          <span className="text-[10px] font-black text-choco-800 uppercase tracking-widest">ID: {item.ean ? item.ean.slice(-6) : '—'}</span>
         </div>
       </div>
 
@@ -446,7 +446,7 @@ function App() {
               // ---- SEARCH RESULTS (flat grid) ----
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {filteredProdukty.map(item => (
-                  <ProductCard key={item.ean} item={item} onClick={setSelectedProductEan} />
+                  <ProductCard key={item.ean || '~'} item={item} onClick={setSelectedProductEan} />
                 ))}
                 {filteredProdukty.length === 0 && (
                   <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">
@@ -520,7 +520,7 @@ function App() {
                 {/* Products grid for active tab */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {filteredTabItems.map(item => (
-                    <ProductCard key={item.ean} item={item} onClick={setSelectedProductEan} />
+                    <ProductCard key={item.ean || '~'} item={item} onClick={setSelectedProductEan} />
                   ))}
                   {filteredTabItems.length === 0 && (
                     <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-choco-200">

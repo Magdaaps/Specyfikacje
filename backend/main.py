@@ -95,6 +95,13 @@ def update_surowiec(surowiec_id: int, surowiec: schemas.SurowiecCreate, db: Sess
     return crud.update_surowiec(db=db, surowiec_id=surowiec_id, surowiec=surowiec)
 
 # --- PRODUKTY ---
+# Sentinel for products with empty-string EAN (primary key = "").
+# Frontend passes "~" when item.ean is empty; backend decodes it back to "".
+_EAN_EMPTY_SENTINEL = "~"
+
+def _decode_ean(ean: str) -> str:
+    return "" if ean == _EAN_EMPTY_SENTINEL else ean
+
 @app.get("/produkty", response_model=List[schemas.Produkt])
 def read_produkty(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     items = crud.get_produkty(db, skip=skip, limit=limit)
@@ -102,7 +109,8 @@ def read_produkty(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 
 @app.put("/produkty/{ean}", response_model=schemas.Produkt)
 def update_produkt(ean: str, produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
-    logger.info(f"DB: UPDATING PRODUCT (PUT) EAN: {ean}")
+    ean = _decode_ean(ean)
+    logger.info(f"DB: UPDATING PRODUCT (PUT) EAN: {ean!r}")
     return crud.update_produkt(db=db, ean=ean, produkt=produkt)
 
 @app.patch("/produkty/{ean}/image")
@@ -117,6 +125,7 @@ def update_product_image(ean: str, image_url: Optional[str] = Body(None, embed=T
 
 @app.get("/produkty/{ean}", response_model=schemas.Produkt)
 def read_produkt(ean: str, db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
     db_produkt = crud.get_produkt(db, ean=ean)
     if db_produkt is None:
         raise HTTPException(status_code=404, detail="Produkt not found")
@@ -215,7 +224,8 @@ def get_organoleptyka_suggestions(
 # Business Logic Endpoints
 @app.get("/produkty/{ean}/analiza")
 def analyze_product(ean: str, db: Session = Depends(get_db)):
-    logger.info(f"Analyzing product with EAN: {ean}")
+    ean = _decode_ean(ean)
+    logger.info(f"Analyzing product with EAN: {ean!r}")
     db_produkt = crud.get_produkt(db, ean=ean)
     if not db_produkt:
         raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
@@ -241,7 +251,8 @@ def analyze_product(ean: str, db: Session = Depends(get_db)):
 
 @app.get("/produkty/{ean}/download")
 def download_card(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
-    logger.info(f"Generating download for EAN: {ean}, lang: {lang}")
+    ean = _decode_ean(ean)
+    logger.info(f"Generating download for EAN: {ean!r}, lang: {lang}")
     db_produkt = crud.get_produkt(db, ean=ean)
     if not db_produkt:
         raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
@@ -286,7 +297,8 @@ def sync_to_sharepoint(ean: str, folder: str, lang: str = "pl", db: Session = De
 
 @app.get("/produkty/{ean}/pdf")
 def download_pdf(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
-    logger.info(f"Generating PDF for EAN: {ean}, lang: {lang}")
+    ean = _decode_ean(ean)
+    logger.info(f"Generating PDF for EAN: {ean!r}, lang: {lang}")
     db_produkt = crud.get_produkt(db, ean=ean)
     if not db_produkt:
         raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
