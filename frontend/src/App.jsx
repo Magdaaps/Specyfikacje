@@ -126,7 +126,9 @@ function App() {
     const interceptor = axios.interceptors.response.use(
       response => response,
       error => {
-        const message = error.response?.data?.error || error.message || "Wystąpił nieoczekiwany błąd"
+        const data = error.response?.data
+        const detail422 = Array.isArray(data?.detail) ? `[${data.detail[0]?.loc?.slice(1).join('.')}] ${data.detail[0]?.msg}` : null
+        const message = data?.error || detail422 || error.message || "Wystąpił nieoczekiwany błąd"
         setNotification({ message, type: 'error' })
         return Promise.reject(error)
       }

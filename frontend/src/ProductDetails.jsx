@@ -304,9 +304,9 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                 masa_netto: product.masa_netto,
                 image_url: product.image_url,
                 skladniki: product.skladniki.map(s => ({
-                    surowiec_id: s.surowiec_id,
-                    procent: s.procent,
-                    kolejnosc: s.kolejnosc
+                    surowiec_id: ni(s.surowiec_id),
+                    procent: n(s.procent),
+                    kolejnosc: ni(s.kolejnosc)
                 })),
                 organoleptyka_smak: product.organoleptyka_smak,
                 organoleptyka_zapach: product.organoleptyka_zapach,
