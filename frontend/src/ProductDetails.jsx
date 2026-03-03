@@ -70,6 +70,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     const [imgHeaderFailed, setImgHeaderFailed] = useState(false)
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
+    const lastSavedEanRef = useRef(ean) // tracks the EAN currently in DB (may differ from prop after EAN change)
 
     const isDirty = () => {
         return JSON.stringify(product) !== JSON.stringify(initialProduct)
@@ -145,12 +146,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
         })
     }, [product?.logistyka_warstw_na_palecie, product?.logistyka_wymiary_zbiorcze1_h, product?.logistyka_wymiary_zbiorcze2_h, product?.logistyka_wymiary_zbiorcze3_h])
 
-    const fetchData = async () => {
+    const fetchData = async (eanOverride) => {
+        const resolvedEan = eanOverride ?? lastSavedEanRef.current
         setLoading(true)
         try {
             const [prodRes, analRes, surRes] = await Promise.all([
-                axios.get(`${API_BASE}/produkty/${ean}`),
-                axios.get(`${API_BASE}/produkty/${ean}/analiza`),
+                axios.get(`${API_BASE}/produkty/${resolvedEan}`),
+                axios.get(`${API_BASE}/produkty/${resolvedEan}/analiza`),
                 axios.get(`${API_BASE}/surowce/`)
             ])
             setProduct(prodRes.data)
@@ -350,10 +352,12 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                 logistyka_sztuk_na_warstwie: ni(product.logistyka_sztuk_na_warstwie),
                 logistyka_wysokosc_palety: n(product.logistyka_wysokosc_palety)
             }
-            await axios.put(`${API_BASE}/produkty/${ean}`, payload)
+            await axios.put(`${API_BASE}/produkty/${lastSavedEanRef.current}`, payload)
+            const newEan = product.ean || '~'
+            lastSavedEanRef.current = newEan
             notify("Zmiany zostały zapisane pomyślnie!", 'success')
             setInitialProduct(product) // Sync initial state after successful save
-            fetchData() // Refresh local data
+            fetchData(newEan) // Refresh local data using new EAN
             if (onRefresh) onRefresh() // Refresh main list
         } catch (err) {
             // Global interceptor handles error
