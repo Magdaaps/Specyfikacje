@@ -76,6 +76,7 @@ def _build_master_translator() -> list:
         "allergen_presence",
         # document_fields excluded: UI labels only, not content words
         "seasons_occasions",
+        "countries",
     ]:
         combined.update(_TRANSLATIONS.get(section, {}))
     # Sort by PL phrase length descending – longest phrase wins
