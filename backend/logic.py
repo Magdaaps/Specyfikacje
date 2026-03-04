@@ -83,8 +83,10 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
                         name = item.get('nazwa', '').strip()
                         if not name:
                             continue
-                        name = _t(name)
                         percent = float(item.get('procent', 0))
+                        if percent <= 0:
+                            continue
+                        name = _t(name)
                         contribution = (percent / 100.0) * raw_material_percent
 
                         total_ingredients[name] = total_ingredients.get(name, 0) + contribution
@@ -100,15 +102,50 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
                 name = s.surowiec.nazwa
             total_ingredients[name] = total_ingredients.get(name, 0) + raw_material_percent
 
-    # Sort ingredients by percentage descending
+    # Sort ingredients by percentage descending (stable sort preserves insertion order for ties)
     sorted_ingredients = sorted(total_ingredients.items(), key=lambda x: x[1], reverse=True)
-    
-    parts = []
+
+    # Group entries that share a "prefix: identifier" pattern (e.g. multiple barwnik: Exx)
+    prefix_groups = {}  # prefix -> [(identifier, percent)]  — preserves sorted order
+    ungrouped = []      # [(name, percent)]
+
     for name, percent in sorted_ingredients:
-        if percent > 0:
-            parts.append(f"{name} ({round(percent, 2)}%)")
-        
-    return ", ".join(parts)
+        if percent <= 0:
+            continue
+        if ': ' in name:
+            prefix, identifier = name.split(': ', 1)
+            if prefix not in prefix_groups:
+                prefix_groups[prefix] = []
+            prefix_groups[prefix].append((identifier, percent))
+        else:
+            ungrouped.append((name, percent))
+
+    # Build final parts: (display_str, sort_key, use_semicolon_after)
+    final_parts = []
+
+    for name, percent in ungrouped:
+        final_parts.append((f"{name} ({round(percent, 2)}%)", percent, False))
+
+    for prefix, items in prefix_groups.items():
+        combined_percent = sum(p for _, p in items)
+        ids_str = ', '.join(id_ for id_, _ in items)
+        use_semi = len(items) > 1
+        final_parts.append((f"{prefix}: {ids_str} ({round(combined_percent, 2)}%)", combined_percent, use_semi))
+
+    # Sort final parts by combined percent descending
+    final_parts.sort(key=lambda x: x[1], reverse=True)
+
+    # Build output string with ; after grouped additive categories, , elsewhere
+    result = []
+    for i, (display, _, use_semi) in enumerate(final_parts):
+        is_last = (i == len(final_parts) - 1)
+        result.append(display)
+        if not is_last:
+            result.append('; ' if use_semi else ', ')
+        elif use_semi:
+            result.append(';')
+
+    return ''.join(result)
 
 def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
     aggregation = {} # { name: { "percent": sum, "countries": set } }
@@ -151,13 +188,16 @@ def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
             except:
                 pass
 
+        use_fallback = True
         if sklad_list and len(sklad_list) > 0:
             for item in sklad_list:
                 pl_name = item.get('nazwa', '').strip()
                 if not pl_name: continue
-                display_name = _t(pl_name)
                 percent = float(item.get('procent', 0))
+                if percent <= 0: continue
+                display_name = _t(pl_name)
                 contribution = (percent / 100.0) * raw_material_percent
+                use_fallback = False
 
                 if display_name not in aggregation:
                     aggregation[display_name] = {"percent": 0.0, "countries": set()}
@@ -168,7 +208,8 @@ def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
                 countries = origins_dict.get(pl_name, [])
                 for c in countries:
                     aggregation[display_name]["countries"].add(c)
-        else:
+
+        if use_fallback:
             # Fallback to raw material name
             pl_name = s.surowiec.nazwa
             display_name = _t(pl_name)

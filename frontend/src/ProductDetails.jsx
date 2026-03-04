@@ -398,6 +398,91 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
         return nutrition;
     })() : null;
 
+    // Live Ingredients Text (mirrors backend generate_ingredients_text logic)
+    const liveIngredientsText = product ? (() => {
+        const totalIngredients = {}
+        for (const sk of product.skladniki) {
+            const rawMaterialPercent = sk.procent || 0
+            const surowiec = sk.surowiec
+            if (!surowiec) continue
+
+            let ingredientsFound = false
+            const skladProcentowy = surowiec.sklad_procentowy
+
+            if (skladProcentowy) {
+                try {
+                    const skladList = JSON.parse(skladProcentowy)
+                    if (Array.isArray(skladList) && skladList.length > 0) {
+                        for (const item of skladList) {
+                            const name = (item.nazwa || '').trim()
+                            if (!name) continue
+                            const percent = parseFloat(item.procent || 0)
+                            if (percent <= 0) continue
+                            const contribution = (percent / 100.0) * rawMaterialPercent
+                            totalIngredients[name] = (totalIngredients[name] || 0) + contribution
+                            ingredientsFound = true
+                        }
+                    }
+                } catch (e) {
+                    // JSON parse error – use fallback
+                }
+            }
+
+            if (!ingredientsFound) {
+                const name = surowiec.nazwa || ''
+                if (name) {
+                    totalIngredients[name] = (totalIngredients[name] || 0) + rawMaterialPercent
+                }
+            }
+        }
+
+        const sortedIngredients = Object.entries(totalIngredients)
+            .filter(([, pct]) => pct > 0)
+            .sort(([, a], [, b]) => b - a)
+
+        // Group entries that share a "prefix: identifier" pattern (e.g. multiple barwnik: Exx)
+        const prefixGroups = {}
+        const ungrouped = []
+
+        for (const [name, percent] of sortedIngredients) {
+            const colonIdx = name.indexOf(': ')
+            if (colonIdx !== -1) {
+                const prefix = name.substring(0, colonIdx)
+                const identifier = name.substring(colonIdx + 2)
+                if (!prefixGroups[prefix]) prefixGroups[prefix] = []
+                prefixGroups[prefix].push([identifier, percent])
+            } else {
+                ungrouped.push([name, percent])
+            }
+        }
+
+        // Build final parts: [display, sortKey, useSemi]
+        const finalParts = []
+
+        for (const [name, percent] of ungrouped) {
+            finalParts.push([`${name} (${Math.round(percent * 100) / 100}%)`, percent, false])
+        }
+
+        for (const [prefix, items] of Object.entries(prefixGroups)) {
+            const combinedPercent = items.reduce((sum, [, p]) => sum + p, 0)
+            const idsStr = items.map(([id]) => id).join(', ')
+            const useSemi = items.length > 1
+            finalParts.push([`${prefix}: ${idsStr} (${Math.round(combinedPercent * 100) / 100}%)`, combinedPercent, useSemi])
+        }
+
+        finalParts.sort(([, a], [, b]) => b - a)
+
+        let result = ''
+        for (let i = 0; i < finalParts.length; i++) {
+            const [display, , useSemi] = finalParts[i]
+            const isLast = i === finalParts.length - 1
+            result += display
+            if (!isLast) result += useSemi ? '; ' : ', '
+            else if (useSemi) result += ';'
+        }
+        return result
+    })() : ''
+
     const nutritionLabels = {
         energia_kj: "Energia Kj:",
         energia_kcal: "Energia Kcal:",
@@ -867,7 +952,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
                                     <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">Skład</h4>
                                     <div
                                         className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic"
-                                        dangerouslySetInnerHTML={{ __html: boldAllergens(analysis?.ingredients_pl || '') }}
+                                        dangerouslySetInnerHTML={{ __html: boldAllergens(liveIngredientsText || analysis?.ingredients_pl || '') }}
                                     />
                                 </div>
 
