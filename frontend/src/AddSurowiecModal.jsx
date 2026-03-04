@@ -6,39 +6,49 @@ const API_BASE = import.meta.env.VITE_API_BASE || ""
 
 export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec }) {
     // Initial state setup with JSON parsing for complex fields
+    const emptyDefaults = {
+        nazwa: '',
+        kraj_pochodzenia: '',
+        energia_kj: 0,
+        energia_kcal: 0,
+        tluszcz: 0,
+        kwasy_nasycone: 0,
+        weglowodany: 0,
+        cukry: 0,
+        bialko: 0,
+        sol: 0,
+        blonnik: 0,
+        sklad_pl: '',
+        alergen_gluten: 'Nie zawiera',
+        alergen_skorupiaki: 'Nie zawiera',
+        alergen_jaja: 'Nie zawiera',
+        alergen_ryby: 'Nie zawiera',
+        alergen_orzeszki_ziemne: 'Nie zawiera',
+        alergen_soja: 'Nie zawiera',
+        alergen_mleko: 'Nie zawiera',
+        alergen_orzechy: 'Nie zawiera',
+        alergen_seler: 'Nie zawiera',
+        alergen_gorczyca: 'Nie zawiera',
+        alergen_sezam: 'Nie zawiera',
+        alergen_dwutlenek_siarki: 'Nie zawiera',
+        alergen_lubin: 'Nie zawiera',
+        alergen_mieczaki: 'Nie zawiera',
+        sklad_procentowy: '[]',
+        pochodzenie_skladnikow: '[]',
+        kategoria: 'Inne'
+    }
+
     const getInitialData = () => {
-        if (!surowiec) return {
-            nazwa: '',
-            kraj_pochodzenia: '',
-            energia_kj: 0,
-            energia_kcal: 0,
-            tluszcz: 0,
-            kwasy_nasycone: 0,
-            weglowodany: 0,
-            cukry: 0,
-            bialko: 0,
-            sol: 0,
-            blonnik: 0,
-            sklad_pl: '',
-            alergen_gluten: 'Nie zawiera',
-            alergen_skorupiaki: 'Nie zawiera',
-            alergen_jaja: 'Nie zawiera',
-            alergen_ryby: 'Nie zawiera',
-            alergen_orzeszki_ziemne: 'Nie zawiera',
-            alergen_soja: 'Nie zawiera',
-            alergen_mleko: 'Nie zawiera',
-            alergen_orzechy: 'Nie zawiera',
-            alergen_seler: 'Nie zawiera',
-            alergen_gorczyca: 'Nie zawiera',
-            alergen_sezam: 'Nie zawiera',
-            alergen_dwutlenek_siarki: 'Nie zawiera',
-            alergen_lubin: 'Nie zawiera',
-            alergen_mieczaki: 'Nie zawiera',
-            sklad_procentowy: '[]',
-            pochodzenie_skladnikow: '[]',
-            kategoria: 'Inne'
+        // No surowiec — blank new form
+        if (!surowiec) return emptyDefaults
+
+        // Template object (e.g. from "Dodaj kategorię") — has no id, pre-fill kategoria only
+        if (!surowiec.id) return {
+            ...emptyDefaults,
+            kategoria: surowiec.kategoria || 'Inne'
         }
 
+        // Editing existing surowiec
         return {
             ...surowiec,
             sklad_procentowy: surowiec.sklad_procentowy || '[]',
@@ -76,7 +86,7 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec 
         }
 
         try {
-            if (surowiec) {
+            if (surowiec && surowiec.id) {
                 await axios.put(`${API_BASE}/surowce/${surowiec.id}`, finalData)
                 notify("Surowiec został zaktualizowany!", "success")
             } else {
