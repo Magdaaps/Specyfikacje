@@ -95,9 +95,28 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec 
     const parseIngredientsFromText = () => {
         if (!formData.sklad_pl) return
 
-        const items = formData.sklad_pl
-            .split(/[,;]+/)
-            .map(s => s.replace(/\s+/g, ' ').trim())
+        // Split on , or ; only when NOT inside parentheses
+        const splitOutsideParens = (str) => {
+            const result = []
+            let current = ''
+            let depth = 0
+            for (const char of str) {
+                if (char === '(') depth++
+                else if (char === ')') depth--
+                else if ((char === ',' || char === ';') && depth === 0) {
+                    const trimmed = current.replace(/\s+/g, ' ').trim()
+                    if (trimmed) result.push(trimmed)
+                    current = ''
+                    continue
+                }
+                current += char
+            }
+            const trimmed = current.replace(/\s+/g, ' ').trim()
+            if (trimmed) result.push(trimmed)
+            return result
+        }
+
+        const items = splitOutsideParens(formData.sklad_pl)
             .filter(s => s.length > 0 && !s.toLowerCase().includes('skład') && !s.toLowerCase().includes('składniki'))
 
         const newProcenty = items.map(name => {
