@@ -58,9 +58,12 @@ function boldAllergens(text) {
 }
 
 function fmtPct(p) {
-    if (p >= 1) return p.toFixed(1).replace('.', ',')
-    if (p >= 0.01) return (Math.round(p * 100) / 100).toString().replace('.', ',')
-    return (Math.round(p * 1000) / 1000).toString().replace('.', ',')
+    if (p >= 1)      return p.toFixed(1).replace('.', ',')
+    if (p >= 0.01)   return (Math.round(p * 100) / 100).toString().replace('.', ',')
+    if (p >= 0.001)  return (Math.round(p * 1000) / 1000).toString().replace('.', ',')
+    if (p >= 0.0001) return (Math.round(p * 10000) / 10000).toString().replace('.', ',')
+    if (p > 0)       return (Math.round(p * 100000) / 100000).toString().replace('.', ',')
+    return '0'
 }
 
 export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
@@ -471,7 +474,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
         // Build final parts: [display, sortKey, useSemi]
         const finalParts = []
 
-        const _fmt = p => p >= 0.01 ? String(Math.round(p * 100) / 100) : String(Math.round(p * 1000) / 1000)
+        const _fmt = p => {
+            if (p >= 0.01)   return String(Math.round(p * 100) / 100)
+            if (p >= 0.001)  return String(Math.round(p * 1000) / 1000)
+            if (p >= 0.0001) return String(Math.round(p * 10000) / 10000)
+            if (p > 0)       return String(Math.round(p * 100000) / 100000)
+            return '0'
+        }
 
         for (const [name, percent] of ungrouped) {
             finalParts.push([`${name} (${_fmt(percent)}%)`, percent, false])

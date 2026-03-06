@@ -110,7 +110,11 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
     ungrouped = []      # [(name, percent)]
 
     def _fmt_pct(p):
-        return str(round(p, 2)) if p >= 0.01 else str(round(p, 3))
+        if p >= 0.01:   return str(round(p, 2))
+        if p >= 0.001:  return str(round(p, 3))
+        if p >= 0.0001: return str(round(p, 4))
+        if p > 0:       return str(round(p, 5))
+        return '0'
 
     for name, percent in sorted_ingredients:
         if percent <= 0:
