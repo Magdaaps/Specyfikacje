@@ -110,10 +110,10 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
     ungrouped = []      # [(name, percent)]
 
     def _fmt_pct(p):
-        if p >= 0.01:   return str(round(p, 2))
-        if p >= 0.001:  return str(round(p, 3))
-        if p >= 0.0001: return str(round(p, 4))
-        if p > 0:       return str(round(p, 5))
+        if p >= 0.01:   return f'{p:.2f}'
+        if p >= 0.001:  return f'{p:.3f}'
+        if p >= 0.0001: return f'{p:.4f}'
+        if p > 0:       return f'{p:.5f}'
         return '0'
 
     for name, percent in sorted_ingredients:
@@ -234,7 +234,7 @@ def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
     for name, data in aggregation.items():
         result.append({
             "name": name,
-            "percent": round(data["percent"], 4), # Higher precision for sorting, display will round to 2
+            "percent": round(data["percent"], 6),
             "countries": sorted(list(data["countries"]))
         })
     

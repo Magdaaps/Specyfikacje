@@ -653,10 +653,18 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
             return _translate_any_text(name)
         return name
 
+    def _fmt_origin_pct(p):
+        if p >= 1:      return f'{p:.1f}'.replace('.', ',')
+        if p >= 0.01:   return f'{p:.2f}'.replace('.', ',')
+        if p >= 0.001:  return f'{p:.3f}'.replace('.', ',')
+        if p >= 0.0001: return f'{p:.4f}'.replace('.', ',')
+        if p > 0:       return f'{p:.5f}'.replace('.', ',')
+        return '0'
+
     origin_rows = "".join([
         f'<tr class="data-row">'
         f'<td>{_origin_name(item["name"])}</td>'
-        f'<td style="text-align: center;">{str(round(item["percent"], 1) if item["percent"] >= 1 else round(item["percent"], 2)).replace(".", ",")}%</td>'
+        f'<td style="text-align: center;">{_fmt_origin_pct(item["percent"])}%</td>'
         f'<td>{", ".join(_translate_countries(item["countries"], lang)) if item["countries"] else "-"}</td>'
         f'</tr>'
         for item in ingredient_origins
