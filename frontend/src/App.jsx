@@ -109,6 +109,7 @@ function App() {
   const [showAddSurowiecModal, setShowAddSurowiecModal] = useState(false)
   const [editingSurowiec, setEditingSurowiec] = useState(null)
   const [notification, setNotification] = useState(null)
+  const [surowceVersion, setSurowceVersion] = useState(0)
 
   // New state for categories
   const [selectedCategory, setSelectedCategory] = useState(null)
@@ -552,6 +553,7 @@ function App() {
             onClose={() => setSelectedProductEan(null)}
             onRefresh={fetchData}
             notify={(msg, type) => setNotification({ message: msg, type })}
+            surowceVersion={surowceVersion}
           />
         )}
 
@@ -571,7 +573,7 @@ function App() {
               setShowAddSurowiecModal(false)
               setEditingSurowiec(null)
             }}
-            onRefresh={fetchData}
+            onRefresh={() => { fetchData(); setSurowceVersion(v => v + 1) }}
             notify={(msg, type) => setNotification({ message: msg, type })}
           />
         )}

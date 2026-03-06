@@ -57,7 +57,7 @@ function boldAllergens(text) {
     return _escapeHtml(text).replace(_allergenPattern, '<strong>$1</strong>')
 }
 
-export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
+export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
     const [product, setProduct] = useState(null)
     const [initialProduct, setInitialProduct] = useState(null)
     const [analysis, setAnalysis] = useState(null)
@@ -71,6 +71,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
     const lastSavedEanRef = useRef(ean) // tracks the EAN currently in DB (may differ from prop after EAN change)
+    const initialSurowceVersionRef = useRef(surowceVersion)
 
     const isDirty = () => {
         return JSON.stringify(product) !== JSON.stringify(initialProduct)
@@ -100,6 +101,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh }) {
     useEffect(() => {
         fetchData()
     }, [ean])
+
+    useEffect(() => {
+        if (surowceVersion === initialSurowceVersionRef.current) return
+        fetchData()
+    }, [surowceVersion])
 
     useEffect(() => {
         if (!userChangedInputRef.current) return
