@@ -57,6 +57,12 @@ function boldAllergens(text) {
     return _escapeHtml(text).replace(_allergenPattern, '<strong>$1</strong>')
 }
 
+function fmtPct(p) {
+    if (p >= 1) return p.toFixed(1).replace('.', ',')
+    if (p >= 0.01) return (Math.round(p * 100) / 100).toString().replace('.', ',')
+    return (Math.round(p * 1000) / 1000).toString().replace('.', ',')
+}
+
 export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
     const [product, setProduct] = useState(null)
     const [initialProduct, setInitialProduct] = useState(null)
@@ -465,15 +471,17 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
         // Build final parts: [display, sortKey, useSemi]
         const finalParts = []
 
+        const _fmt = p => p >= 0.01 ? String(Math.round(p * 100) / 100) : String(Math.round(p * 1000) / 1000)
+
         for (const [name, percent] of ungrouped) {
-            finalParts.push([`${name} (${Math.round(percent * 100) / 100}%)`, percent, false])
+            finalParts.push([`${name} (${_fmt(percent)}%)`, percent, false])
         }
 
         for (const [prefix, items] of Object.entries(prefixGroups)) {
             const combinedPercent = items.reduce((sum, [, p]) => sum + p, 0)
             const idsStr = items.map(([id]) => id).join(', ')
             const useSemi = items.length > 1
-            finalParts.push([`${prefix}: ${idsStr} (${Math.round(combinedPercent * 100) / 100}%)`, combinedPercent, useSemi])
+            finalParts.push([`${prefix}: ${idsStr} (${_fmt(combinedPercent)}%)`, combinedPercent, useSemi])
         }
 
         finalParts.sort(([, a], [, b]) => b - a)
@@ -976,7 +984,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 </span>
                                                 <span className="text-choco-300">—</span>
                                                 <span className="font-black text-gold-600 w-20 text-center">
-                                                    {(item.percent >= 1 ? item.percent.toFixed(1) : item.percent.toFixed(2)).replace('.', ',')}%
+                                                    {fmtPct(item.percent)}%
                                                 </span>
                                                 <span className="text-choco-300">—</span>
                                                 <span className="text-choco-500 italic font-medium flex-1">
