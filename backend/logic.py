@@ -109,6 +109,9 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
     prefix_groups = {}  # prefix -> [(identifier, percent)]  — preserves sorted order
     ungrouped = []      # [(name, percent)]
 
+    def _fmt_pct(p):
+        return str(round(p, 2)) if p >= 0.01 else str(round(p, 3))
+
     for name, percent in sorted_ingredients:
         if percent <= 0:
             continue
@@ -124,13 +127,13 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
     final_parts = []
 
     for name, percent in ungrouped:
-        final_parts.append((f"{name} ({round(percent, 2)}%)", percent, False))
+        final_parts.append((f"{name} ({_fmt_pct(percent)}%)", percent, False))
 
     for prefix, items in prefix_groups.items():
         combined_percent = sum(p for _, p in items)
         ids_str = ', '.join(id_ for id_, _ in items)
         use_semi = len(items) > 1
-        final_parts.append((f"{prefix}: {ids_str} ({round(combined_percent, 2)}%)", combined_percent, use_semi))
+        final_parts.append((f"{prefix}: {ids_str} ({_fmt_pct(combined_percent)}%)", combined_percent, use_semi))
 
     # Sort final parts by combined percent descending
     final_parts.sort(key=lambda x: x[1], reverse=True)
