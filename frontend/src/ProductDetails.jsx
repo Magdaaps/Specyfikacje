@@ -1453,7 +1453,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                 </div >
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-choco-100 flex items-center gap-2 bg-white/80 backdrop-blur-xl flex-wrap">
+                <div className="px-6 py-4 border-t border-choco-100 flex items-center gap-2 bg-white/80 backdrop-blur-xl overflow-x-auto">
                     {/* Export buttons — secondary, compact */}
                     <button
                         onClick={() => handleDownload('pl')}
@@ -1488,7 +1488,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                         className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
                     >
                         <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                        Usuń produkt
+                        Usuń
                     </button>
 
                     {/* Spacer */}
