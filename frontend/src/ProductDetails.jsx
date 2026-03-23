@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import {
     X,
@@ -20,10 +20,10 @@ const API_BASE = import.meta.env.VITE_API_BASE || ""
 // ---------------------------------------------------------------------------
 // Allergen auto-bolding
 // ---------------------------------------------------------------------------
-const _PL_CHARS = 'a-zA-ZąęóśźżćńłĄĘÓŚŹŻĆŃŁ'
+const _PL_CHARS = 'a-zA-ZÄ…Ä™ĂłĹ›ĹşĹĽÄ‡Ĺ„Ĺ‚Ä„ÄĂ“ĹšĹąĹ»Ä†ĹĹ'
 
 const _ALLERGEN_BOLD_WORDS = [
-    // Multi-word phrases first (longest → shortest prevents partial overlap)
+    // Multi-word phrases first (longest â†’ shortest prevents partial overlap)
     'orzeszki arachidowe',
     'orzechy laskowe',
     // Single words
@@ -31,7 +31,7 @@ const _ALLERGEN_BOLD_WORDS = [
     'soja', 'soi', 'sojowa', 'sojowe',
     'gluten', 'pszenna',
     'jaja', 'jaj',
-    'orzechy', 'migdały', 'pistacje', 'pisatacje',
+    'orzechy', 'migdaĹ‚y', 'pistacje', 'pisatacje',
     'sezam',
 ]
 
@@ -88,7 +88,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
     const handleTabChange = (newTab) => {
         if (isDirty()) {
-            if (window.confirm("Masz niezapisane zmiany. Czy na pewno chcesz zmienić zakładkę?")) {
+            if (window.confirm("Masz niezapisane zmiany. Czy na pewno chcesz zmieniÄ‡ zakĹ‚adkÄ™?")) {
                 setActiveTab(newTab)
             }
         } else {
@@ -218,7 +218,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
             document.body.appendChild(link)
             link.click()
             link.remove()
-            notify(`Pobieranie karty (${lang.toUpperCase()}) rozpoczęte`, 'success')
+            notify(`Pobieranie karty (${lang.toUpperCase()}) rozpoczÄ™te`, 'success')
         } catch (err) {
             // Global interceptor handles the notification
         }
@@ -238,7 +238,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
             document.body.appendChild(link)
             link.click()
             link.remove()
-            notify('Pobieranie specyfikacji PDF rozpoczęte', 'success')
+            notify('Pobieranie specyfikacji PDF rozpoczÄ™te', 'success')
         } catch (err) {
             // Error handled by global interceptor
         }
@@ -265,15 +265,15 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     }
 
     const handleDeleteProdukt = async () => {
-        if (!window.confirm('Czy na pewno chcesz usunąć ten produkt? Tej operacji nie można cofnąć.')) return
+        if (!window.confirm('Czy na pewno chcesz usunÄ…Ä‡ ten produkt? Tej operacji nie moĹĽna cofnÄ…Ä‡.')) return
         try {
             const encodedEan = ean === '' ? '~' : ean
             await axios.delete(`${API_BASE}/produkty/${encodedEan}`)
-            notify('Produkt usunięty.', 'success')
+            notify('Produkt usuniÄ™ty.', 'success')
             onClose()
             if (onRefresh) onRefresh()
         } catch (err) {
-            notify('Błąd podczas usuwania produktu.', 'error')
+            notify('BĹ‚Ä…d podczas usuwania produktu.', 'error')
         }
     }
 
@@ -288,14 +288,14 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
             const link = document.createElement('a')
             link.href = url
             const safeName = (product?.nazwa_pl || ean)
-                .replace(/[^\w\sąęóśźżćńłĄĘÓŚŹŻĆŃŁ-]/g, '')
+                .replace(/[^\w\sÄ…Ä™ĂłĹ›ĹşĹĽÄ‡Ĺ„Ĺ‚Ä„ÄĂ“ĹšĹąĹ»Ä†ĹĹ-]/g, '')
                 .trim()
                 .replace(/\s+/g, '-')
             link.setAttribute('download', `${safeName}_EN.xlsx`)
             document.body.appendChild(link)
             link.click()
             link.remove()
-            notify('Pobieranie karty EN (XLSX) rozpoczęte', 'success')
+            notify('Pobieranie karty EN (XLSX) rozpoczÄ™te', 'success')
         } catch (err) {
             // Global interceptor handles the notification
         }
@@ -308,7 +308,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
             setSaving(true)
             await axios.post(`${API_BASE}/produkty/${ean}/sharepoint?lang=${lang}&folder=${folder}`)
-            notify("Pomyślnie przesłano do SharePoint!", 'success')
+            notify("PomyĹ›lnie przesĹ‚ano do SharePoint!", 'success')
         } catch (err) {
             // Global interceptor handles error
         } finally {
@@ -383,7 +383,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
             await axios.put(`${API_BASE}/produkty/${lastSavedEanRef.current}`, payload)
             const newEan = product.ean || '~'
             lastSavedEanRef.current = newEan
-            notify("Zmiany zostały zapisane pomyślnie!", 'success')
+            notify("Zmiany zostaĹ‚y zapisane pomyĹ›lnie!", 'success')
             setInitialProduct(product) // Sync initial state after successful save
             fetchData(newEan) // Refresh local data using new EAN
             if (onRefresh) onRefresh() // Refresh main list
@@ -452,7 +452,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                         }
                     }
                 } catch (e) {
-                    // JSON parse error – use fallback
+                    // JSON parse error â€“ use fallback
                 }
             }
 
@@ -527,8 +527,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
         weglowodany: "Weglowodany:",
         cukry: "Cukry:",
         bialko: "Bialko:",
-        sol: "Sól:",
-        blonnik: "Błonnik:"
+        sol: "SĂłl:",
+        blonnik: "BĹ‚onnik:"
     };
 
     if (loading) return (
@@ -582,10 +582,10 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         setImgHeaderFailed(false)
                                         // Auto-save image_url immediately so it persists without requiring Save
                                         await axios.patch(`${API_BASE}/produkty/${product.ean}/image`, { image_url: newUrl })
-                                        notify("Zdjęcie zaktualizowane i zapisane!", "success")
+                                        notify("ZdjÄ™cie zaktualizowane i zapisane!", "success")
                                     } catch (err) {
-                                        const detail = err.response?.data?.detail || err.message || "Nieznany błąd"
-                                        notify(`Błąd przesyłania: ${detail}`, "error")
+                                        const detail = err.response?.data?.detail || err.message || "Nieznany bĹ‚Ä…d"
+                                        notify(`BĹ‚Ä…d przesyĹ‚ania: ${detail}`, "error")
                                         console.error("Upload error:", err.response?.data, err.message)
                                     }
                                 }}
@@ -609,7 +609,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     />
                                     <div className="flex flex-nowrap gap-3 mt-0 items-stretch">
                                         <div className="bg-choco-50 px-3 py-2 rounded-2xl border border-choco-100 flex flex-col group/input focus-within:ring-2 focus-within:ring-gold-500/20 transition-all">
-                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">EAN Sztuka (Główny)</span>
+                                            <span className="text-[8px] font-black text-choco-400 uppercase tracking-widest mb-1 whitespace-nowrap">EAN Sztuka (GĹ‚Ăłwny)</span>
                                             <input
                                                 type="text"
                                                 value={product.ean}
@@ -639,13 +639,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 onChange={(e) => setProduct({ ...product, kategoria: e.target.value })}
                                                 className="bg-transparent text-sm font-bold text-choco-900 focus:outline-none cursor-pointer w-32"
                                             >
-                                                <option value="">— wybierz —</option>
+                                                <option value="">â€” wybierz â€”</option>
                                                 <option value="Wielkanoc">Wielkanoc</option>
-                                                <option value="Boże Narodzenie">Boże Narodzenie</option>
-                                                <option value="Dzień Dziecka">Dzień Dziecka</option>
+                                                <option value="BoĹĽe Narodzenie">BoĹĽe Narodzenie</option>
+                                                <option value="DzieĹ„ Dziecka">DzieĹ„ Dziecka</option>
                                                 <option value="Walentynki">Walentynki</option>
                                                 <option value="Halloween">Halloween</option>
-                                                <option value="Całoroczne">Całoroczne</option>
+                                                <option value="CaĹ‚oroczne">CaĹ‚oroczne</option>
                                             </select>
                                         </div>
                                     </div>
@@ -663,7 +663,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                     {/* Tabs Navigation */}
                     <div className="px-8 flex gap-8 border-t border-choco-50 bg-choco-50/30">
                         {[
-                            { id: 'dane_ogolne', label: 'Dane Ogólne' },
+                            { id: 'dane_ogolne', label: 'Dane OgĂłlne' },
                             { id: 'receptura', label: 'Receptura' },
                             { id: 'logistyka', label: 'Logistyka' },
                             { id: 'inne', label: 'Inne' }
@@ -695,7 +695,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     <div className="flex justify-between items-center mb-6">
                                         <h3 className="text-lg font-black text-choco-800 flex items-center gap-2">
                                             <div className="w-1.5 h-6 bg-gold-600 rounded-full"></div>
-                                            Skład Surowcowy
+                                            SkĹ‚ad Surowcowy
                                         </h3>
                                         <div className="relative">
                                             <button
@@ -728,7 +728,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             <div key={idx} className="bg-white border border-choco-100 rounded-2xl p-4 flex items-center justify-between group hover:border-choco-400 transition-all shadow-sm">
                                                 <div className="flex-1">
                                                     <p className="font-bold text-choco-800">{sk.surowiec.nazwa}</p>
-                                                    <p className="text-[10px] text-choco-500 uppercase font-bold tracking-widest">Kolejność: {sk.kolejnosc}</p>
+                                                    <p className="text-[10px] text-choco-500 uppercase font-bold tracking-widest">KolejnoĹ›Ä‡: {sk.kolejnosc}</p>
                                                 </div>
                                                 <div className="flex items-center gap-6">
                                                     <div className="relative">
@@ -752,7 +752,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         ))}
                                     </div>
                                     <div className="mt-6 p-5 rounded-2xl bg-gold-600/5 border border-gold-600/10 flex items-center justify-between">
-                                        <span className="text-sm font-bold text-choco-600 uppercase tracking-widest">Suma zawartości:</span>
+                                        <span className="text-sm font-bold text-choco-600 uppercase tracking-widest">Suma zawartoĹ›ci:</span>
                                         <span className={`text-xl font-black ${Math.abs(product.skladniki.reduce((acc, s) => acc + s.procent, 0) - 100) < 0.1 ? 'text-green-600' : 'text-gold-600'}`}>
                                             {product.skladniki.reduce((acc, s) => acc + s.procent, 0).toFixed(2)}%
                                         </span>
@@ -779,7 +779,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 if (val.length > 0) fetchSuggestions('prawna_nazwa_pl', val);
                                             }}
                                             className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 min-h-[100px] resize-y custom-scrollbar"
-                                            placeholder="Wpisz nazwę prawną lub opis produktu..."
+                                            placeholder="Wpisz nazwÄ™ prawnÄ… lub opis produktu..."
                                         />
                                         {suggestions['prawna_nazwa_pl'] && suggestions['prawna_nazwa_pl'].length > 0 && (
                                             <div className="absolute left-4 right-4 top-full -mt-1 bg-white border border-choco-100 rounded-xl shadow-xl z-20 max-h-48 overflow-auto custom-scrollbar p-1 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -811,7 +811,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             <thead>
                                                 <tr className="bg-choco-50/50">
                                                     <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 w-1/3 rounded-tl-2xl">Kod</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 rounded-tr-2xl">Rozwinięcie</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 rounded-tr-2xl">RozwiniÄ™cie</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -874,7 +874,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 <tr className="bg-choco-50/50">
                                                     <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 rounded-tl-2xl">Rodzaj</th>
                                                     <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">COID</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 rounded-tr-2xl">Data ważności certyfikatu</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 rounded-tr-2xl">Data waĹĽnoĹ›ci certyfikatu</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -957,7 +957,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                 {/* Generated Data Section */}
                                 <div className="grid grid-cols-2 gap-8 pt-4">
                                     <div>
-                                        <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">Wartości odżywcze / 100g</h4>
+                                        <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">WartoĹ›ci odĹĽywcze / 100g</h4>
                                         <div className="space-y-1">
                                             {liveNutrition && Object.entries(liveNutrition).map(([key, val]) => (
                                                 <div key={key} className="flex justify-between text-sm py-2 border-b border-choco-100/50 last:border-0 text-choco-600">
@@ -972,7 +972,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         <div className="flex flex-wrap gap-2">
                                             {analysis && Object.entries(analysis.allergens).map(([alg, status]) => (
                                                 <span key={alg} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tight ${status === "Zawiera" ? 'bg-red-50 text-red-600 border border-red-200' :
-                                                    status === "Może zawierać" ? 'bg-gold-600/10 text-gold-600 border border-gold-600/20' :
+                                                    status === "MoĹĽe zawieraÄ‡" ? 'bg-gold-600/10 text-gold-600 border border-gold-600/20' :
                                                         'bg-choco-50 text-choco-400 border border-choco-100'
                                                     }`}>
                                                     {alg.replace('_', ' ').replace('dwutlenek siarki', 'SIARKCZYNY')}: {status}
@@ -985,7 +985,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
                                 {/* Ingr List */}
                                 <div className="pt-8 border-t border-choco-100">
-                                    <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">Skład</h4>
+                                    <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">SkĹ‚ad</h4>
                                     <div
                                         className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic"
                                         dangerouslySetInnerHTML={{ __html: boldAllergens(liveIngredientsText || analysis?.ingredients_pl || '') }}
@@ -996,7 +996,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                 <div className="pt-8 border-t border-choco-100">
                                     <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                                         <Info className="w-3 h-3 text-gold-600" />
-                                        Procentowy udział składników w produkcji i ich kraje pochodzenia
+                                        Procentowy udziaĹ‚ skĹ‚adnikĂłw w produkcji i ich kraje pochodzenia
                                     </h4>
                                     <div className="space-y-1">
                                         {analysis?.ingredient_origins?.map((item, idx) => (
@@ -1004,11 +1004,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 <span className="font-bold text-choco-800 group-hover:text-choco-950 transition-colors">
                                                     {item.name}
                                                 </span>
-                                                <span className="text-choco-300">—</span>
+                                                <span className="text-choco-300">â€”</span>
                                                 <span className="font-black text-gold-600 w-20 text-center">
                                                     {fmtPct(item.percent)}%
                                                 </span>
-                                                <span className="text-choco-300">—</span>
+                                                <span className="text-choco-300">â€”</span>
                                                 <span className="text-choco-500 italic font-medium flex-1">
                                                     {item.countries.join(', ') || 'brak danych'}
                                                 </span>
@@ -1037,18 +1037,18 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             <thead>
                                                 <tr className="bg-choco-50/50">
                                                     <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">Poziom</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">Wysokość [cm]</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">Szerokość [cm]</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">Głębokość [cm]</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">WysokoĹ›Ä‡ [cm]</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">SzerokoĹ›Ä‡ [cm]</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">GĹ‚Ä™bokoĹ›Ä‡ [cm]</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {[
                                                     { label: 'Produkt solo', prefix: 'logistyka_wymiary_solo' },
                                                     { label: 'W opakowaniu jednostkowym', prefix: 'logistyka_wymiary_jednostka' },
-                                                    { label: 'Opakowanie zbiorcze 1°', prefix: 'logistyka_wymiary_zbiorcze1', affectsPalletHeight: true },
-                                                    { label: 'Opakowanie zbiorcze 2°', prefix: 'logistyka_wymiary_zbiorcze2', affectsPalletHeight: true },
-                                                    { label: 'Opakowanie zbiorcze 3°', prefix: 'logistyka_wymiary_zbiorcze3', affectsPalletHeight: true },
+                                                    { label: 'Opakowanie zbiorcze 1Â°', prefix: 'logistyka_wymiary_zbiorcze1', affectsPalletHeight: true },
+                                                    { label: 'Opakowanie zbiorcze 2Â°', prefix: 'logistyka_wymiary_zbiorcze2', affectsPalletHeight: true },
+                                                    { label: 'Opakowanie zbiorcze 3Â°', prefix: 'logistyka_wymiary_zbiorcze3', affectsPalletHeight: true },
                                                 ].map((row) => (
                                                     <tr key={row.prefix} className="border-b border-choco-50 last:border-0 hover:bg-choco-50/30 transition-colors">
                                                         <td className="px-6 py-4 text-sm font-bold text-choco-700">{row.label}</td>
@@ -1122,7 +1122,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             <thead>
                                                 <tr className="bg-choco-50/50">
                                                     <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100">Parametr</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 text-center">Wartość [kg]</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-100 text-center">WartoĹ›Ä‡ [kg]</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1161,13 +1161,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     </h3>
                                     <div className="grid grid-cols-2 gap-x-12 gap-y-6 bg-white border border-choco-100 p-8 rounded-2xl shadow-sm">
                                         {[
-                                            { label: 'Ilość sztuk w opakowaniu zbiorczym [szt]', key: 'logistyka_sztuk_w_zbiorczym', isCalcInput: true },
-                                            { label: 'Ilość kartonów na warstwie [szt]', key: 'logistyka_kartonow_na_warstwie', isCalcInput: true },
-                                            { label: 'Ilość warstw na palecie [szt]', key: 'logistyka_warstw_na_palecie', isCalcInput: true, isPalletHeightInput: true },
-                                            { label: 'Ilość sztuk na warstwie palety [szt]', key: 'logistyka_sztuk_na_warstwie', isAuto: true },
-                                            { label: 'Ilość kartonów na palecie [szt]', key: 'logistyka_kartonow_na_palecie', isAuto: true },
-                                            { label: 'Ilość sztuk na palecie [szt]', key: 'logistyka_sztuk_na_palecie', isAuto: true },
-                                            { label: 'Wysokość palety z nośnikiem [cm]', key: 'logistyka_wysokosc_palety', isFloat: true, isAuto: true },
+                                            { label: 'IloĹ›Ä‡ sztuk w opakowaniu zbiorczym [szt]', key: 'logistyka_sztuk_w_zbiorczym', isCalcInput: true },
+                                            { label: 'IloĹ›Ä‡ kartonĂłw na warstwie [szt]', key: 'logistyka_kartonow_na_warstwie', isCalcInput: true },
+                                            { label: 'IloĹ›Ä‡ warstw na palecie [szt]', key: 'logistyka_warstw_na_palecie', isCalcInput: true, isPalletHeightInput: true },
+                                            { label: 'IloĹ›Ä‡ sztuk na warstwie palety [szt]', key: 'logistyka_sztuk_na_warstwie', isAuto: true },
+                                            { label: 'IloĹ›Ä‡ kartonĂłw na palecie [szt]', key: 'logistyka_kartonow_na_palecie', isAuto: true },
+                                            { label: 'IloĹ›Ä‡ sztuk na palecie [szt]', key: 'logistyka_sztuk_na_palecie', isAuto: true },
+                                            { label: 'WysokoĹ›Ä‡ palety z noĹ›nikiem [cm]', key: 'logistyka_wysokosc_palety', isFloat: true, isAuto: true },
                                         ].map((field) => (
                                             <div key={field.key} className="flex flex-col gap-2">
                                                 <label className="text-[10px] font-black text-choco-400 uppercase tracking-widest flex items-center gap-2">
@@ -1216,8 +1216,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                     { key: 'organoleptyka_smak', label: 'SMAK' },
                                                     { key: 'organoleptyka_zapach', label: 'ZAPACH' },
                                                     { key: 'organoleptyka_kolor', label: 'KOLOR' },
-                                                    { key: 'organoleptyka_wyglad_zewnetrzny', label: 'WYGLĄD ZEWNĘTRZNY' },
-                                                    { key: 'organoleptyka_wyglad_na_przekroju', label: 'WYGLĄD NA PRZEKROJU' }
+                                                    { key: 'organoleptyka_wyglad_zewnetrzny', label: 'WYGLÄ„D ZEWNÄTRZNY' },
+                                                    { key: 'organoleptyka_wyglad_na_przekroju', label: 'WYGLÄ„D NA PRZEKROJU' }
                                                 ].map((field) => (
                                                     <tr key={field.key} className="border-b border-choco-50 last:border-0 group hover:bg-choco-50/30 transition-colors">
                                                         <td className="px-6 py-4 text-sm font-bold text-choco-700 align-top uppercase tracking-tight">
@@ -1313,11 +1313,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     </div>
                                 </div>
 
-                                {/* TERMIN PRZYDATNOŚCI DO SPOŻYCIA */}
+                                {/* TERMIN PRZYDATNOĹšCI DO SPOĹ»YCIA */}
                                 <div className="pt-8 border-t border-choco-100">
                                     <h3 className="text-lg font-black text-choco-800 flex items-center gap-2 mb-6 uppercase tracking-wider">
                                         <div className="w-1.5 h-6 bg-gold-600 rounded-full"></div>
-                                        TERMIN PRZYDATNOŚCI DO SPOŻYCIA
+                                        TERMIN PRZYDATNOĹšCI DO SPOĹ»YCIA
                                     </h3>
                                     <div className="relative bg-white border border-choco-100 rounded-2xl shadow-sm p-4">
                                         <textarea
@@ -1337,7 +1337,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 fetchSuggestions('termin_przydatnosci', val, true);
                                             }}
                                             className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2 min-h-[60px] resize-y custom-scrollbar"
-                                            placeholder="Np. 12 miesięcy od daty produkcji..."
+                                            placeholder="Np. 12 miesiÄ™cy od daty produkcji..."
                                         />
                                         {suggestions['termin_przydatnosci'] && suggestions['termin_przydatnosci'].length > 0 && (
                                             <div className="absolute left-4 right-4 top-full -mt-1 bg-white border border-choco-100 rounded-xl shadow-xl z-20 max-h-48 overflow-auto custom-scrollbar p-1 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -1358,11 +1358,11 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     </div>
                                 </div>
 
-                                {/* WYRAŻENIE I FORMAT */}
+                                {/* WYRAĹ»ENIE I FORMAT */}
                                 <div className="pt-8 border-t border-choco-100">
                                     <h3 className="text-lg font-black text-choco-800 flex items-center gap-2 mb-6 uppercase tracking-wider">
                                         <div className="w-1.5 h-6 bg-gold-600 rounded-full"></div>
-                                        WYRAŻENIE I FORMAT
+                                        WYRAĹ»ENIE I FORMAT
                                     </h3>
                                     <div className="relative bg-white border border-choco-100 rounded-2xl shadow-sm p-4">
                                         <textarea
@@ -1382,7 +1382,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 fetchSuggestions('wyrazenie_format_daty', val, true);
                                             }}
                                             className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2 min-h-[60px] resize-y custom-scrollbar"
-                                            placeholder="Np. Najlepiej spożyć przed końcem: MM.RRRR..."
+                                            placeholder="Np. Najlepiej spoĹĽyÄ‡ przed koĹ„cem: MM.RRRR..."
                                         />
                                         {suggestions['wyrazenie_format_daty'] && suggestions['wyrazenie_format_daty'].length > 0 && (
                                             <div className="absolute left-4 right-4 top-full -mt-1 bg-white border border-choco-100 rounded-xl shadow-xl z-20 max-h-48 overflow-auto custom-scrollbar p-1 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -1427,7 +1427,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 fetchSuggestions('informacje_dodatkowe', val, true);
                                             }}
                                             className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2 min-h-[100px] resize-y custom-scrollbar"
-                                            placeholder="Np. Produkt gotowy do spożycia po rozmrożeniu..."
+                                            placeholder="Np. Produkt gotowy do spoĹĽycia po rozmroĹĽeniu..."
                                         />
                                         {suggestions['informacje_dodatkowe'] && suggestions['informacje_dodatkowe'].length > 0 && (
                                             <div className="absolute left-4 right-4 top-full -mt-1 bg-white border border-choco-100 rounded-xl shadow-xl z-20 max-h-48 overflow-auto custom-scrollbar p-1 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -1454,40 +1454,40 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-choco-100 flex items-center gap-2 bg-white/80 backdrop-blur-xl overflow-x-auto">
-                    {/* Export buttons — secondary, compact */}
+                    {/* Export buttons â€” secondary, compact */}
                     <button
                         onClick={() => handleDownload('pl')}
-                        className="flex items-center gap-1.5 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                        className="flex items-center gap-1 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-2 py-1.5 rounded-lg font-bold transition-all text-[9px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        <FileDown className="w-3 h-3 shrink-0" />
                         Eksport PL
                     </button>
                     <button
                         onClick={handleDownloadExcelEn}
-                        className="flex items-center gap-1.5 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                        className="flex items-center gap-1 bg-choco-50 hover:bg-choco-100 text-choco-600 border border-choco-200 px-2 py-1.5 rounded-lg font-bold transition-all text-[9px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        <FileDown className="w-3 h-3 shrink-0" />
                         Eksport EN
                     </button>
                     <button
                         onClick={handleDownloadPDF}
-                        className="flex items-center gap-1.5 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                        className="flex items-center gap-1 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-2 py-1.5 rounded-lg font-bold transition-all text-[9px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        <FileDown className="w-3 h-3 shrink-0" />
                         Eksport PL PDF
                     </button>
                     <button
                         onClick={handleDownloadPDFEn}
-                        className="flex items-center gap-1.5 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                        className="flex items-center gap-1 bg-gold-50 hover:bg-gold-100 text-gold-700 border border-gold-200 px-2 py-1.5 rounded-lg font-bold transition-all text-[9px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        <FileDown className="w-3 h-3 shrink-0" />
                         Eksport EN PDF
                     </button>
                     <button
                         onClick={handleDeleteProdukt}
-                        className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                        className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 px-2 py-1.5 rounded-lg font-bold transition-all text-[9px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        <Trash2 className="w-3 h-3 shrink-0" />
                         Usuń
                     </button>
 
@@ -1498,12 +1498,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 bg-choco-800 hover:bg-choco-700 text-white px-6 py-2.5 rounded-xl font-black transition-all shadow-xl shadow-choco-900/30 disabled:opacity-50 text-xs uppercase tracking-widest whitespace-nowrap shrink-0"
+                        className="flex items-center gap-1.5 bg-choco-800 hover:bg-choco-700 text-white px-4 py-2 rounded-xl font-black transition-all shadow-xl shadow-choco-900/30 disabled:opacity-50 text-[9px] uppercase tracking-widest whitespace-nowrap shrink-0"
                     >
-                        {saving ? 'Czekaj...' : <><Save className="w-4 h-4" /> Zapisz dane</>}
+                        {saving ? 'Czekaj...' : <><Save className="w-3.5 h-3.5" /> Zapisz dane</>}
                     </button>
                 </div>
             </div >
         </div >
     )
 }
+
