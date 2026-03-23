@@ -264,6 +264,19 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
         }
     }
 
+    const handleDeleteProdukt = async () => {
+        if (!window.confirm('Czy na pewno chcesz usunąć ten produkt? Tej operacji nie można cofnąć.')) return
+        try {
+            const encodedEan = ean === '' ? '~' : ean
+            await axios.delete(`${API_BASE}/produkty/${encodedEan}`)
+            notify('Produkt usunięty.', 'success')
+            onClose()
+            if (onRefresh) onRefresh()
+        } catch (err) {
+            notify('Błąd podczas usuwania produktu.', 'error')
+        }
+    }
+
     const handleDownloadExcelEn = async () => {
         try {
             const response = await axios({
@@ -1469,6 +1482,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                     >
                         <FileDown className="w-3.5 h-3.5 shrink-0" />
                         Eksport EN PDF
+                    </button>
+                    <button
+                        onClick={handleDeleteProdukt}
+                        className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 px-3 py-2 rounded-lg font-bold transition-all text-[10px] uppercase tracking-widest whitespace-nowrap"
+                    >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        Usuń produkt
                     </button>
 
                     {/* Spacer */}

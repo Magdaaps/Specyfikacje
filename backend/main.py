@@ -139,6 +139,15 @@ def read_produkt(ean: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Produkt not found")
     return db_produkt
 
+@app.delete("/produkty/{ean}")
+def delete_produkt(ean: str, db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
+    db_produkt = crud.delete_produkt(db=db, ean=ean)
+    if db_produkt is None:
+        raise HTTPException(status_code=404, detail="Produkt not found")
+    logger.info(f"DB: Deleted produkt EAN={ean}")
+    return {"ok": True}
+
 @app.post("/produkty", response_model=schemas.Produkt)
 def create_produkt(produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
     # Check if exists

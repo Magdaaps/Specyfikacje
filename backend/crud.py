@@ -54,6 +54,13 @@ def delete_surowiec(db: Session, surowiec_id: int):
 def get_produkt(db: Session, ean: str):
     return db.query(models.Produkt).filter(models.Produkt.ean == ean).first()
 
+def delete_produkt(db: Session, ean: str):
+    db_produkt = get_produkt(db, ean)
+    if db_produkt:
+        db.delete(db_produkt)
+        db.commit()
+    return db_produkt
+
 def get_produkty(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Produkt).offset(skip).limit(limit).all()
 
