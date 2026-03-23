@@ -373,6 +373,26 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec 
                     >
                         Anuluj
                     </button>
+                    {surowiec && surowiec.id && (
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                if (!window.confirm('Czy na pewno chcesz usunąć ten surowiec?')) return
+                                try {
+                                    await axios.delete(`${API_BASE}/surowce/${surowiec.id}`)
+                                    notify('Surowiec usunięty.', 'success')
+                                    onRefresh()
+                                    onClose()
+                                } catch (err) {
+                                    notify('Błąd podczas usuwania surowca.', 'error')
+                                }
+                            }}
+                            className="flex-1 px-6 py-4 border border-red-200 rounded-2xl font-black text-red-500 hover:bg-red-50 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Usuń
+                        </button>
+                    )}
                     <button
                         form="surowiec-form"
                         type="submit"

@@ -42,6 +42,13 @@ def update_surowiec(db: Session, surowiec_id: int, surowiec: schemas.SurowiecCre
             raise
     return db_surowiec
 
+def delete_surowiec(db: Session, surowiec_id: int):
+    db_surowiec = get_surowiec(db, surowiec_id)
+    if db_surowiec:
+        db.delete(db_surowiec)
+        db.commit()
+    return db_surowiec
+
 # Produkty
 def get_produkt(db: Session, ean: str):
     return db.query(models.Produkt).filter(models.Produkt.ean == ean).first()

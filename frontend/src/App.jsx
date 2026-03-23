@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   ArrowLeft,
-  FolderPlus
+  FolderPlus,
+  Trash2
 } from 'lucide-react'
 import ProductDetails from './ProductDetails'
 import AddProductModal from './AddProductModal'
@@ -110,6 +111,19 @@ function App() {
   const [editingSurowiec, setEditingSurowiec] = useState(null)
   const [notification, setNotification] = useState(null)
   const [surowceVersion, setSurowceVersion] = useState(0)
+
+  const handleDeleteSurowiec = async (e, surowiecId) => {
+    e.stopPropagation()
+    if (!window.confirm('Czy na pewno chcesz usunąć ten surowiec?')) return
+    try {
+      await axios.delete(`${API_BASE}/surowce/${surowiecId}`)
+      fetchData()
+      setSurowceVersion(v => v + 1)
+      setNotification({ message: 'Surowiec usunięty.', type: 'success' })
+    } catch (err) {
+      setNotification({ message: 'Błąd podczas usuwania surowca.', type: 'error' })
+    }
+  }
 
   // New state for categories
   const [selectedCategory, setSelectedCategory] = useState(null)
@@ -377,7 +391,16 @@ function App() {
                             </span>
                           </div>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => handleDeleteSurowiec(e, item.id)}
+                            className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Usuń surowiec"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                        </div>
                       </div>
                     ))}
                     {filteredSurowce.length === 0 && (
@@ -406,7 +429,16 @@ function App() {
                             {item.nazwa}
                           </span>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => handleDeleteSurowiec(e, item.id)}
+                            className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Usuń surowiec"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <ChevronRight className="w-5 h-5 text-choco-200 group-hover:text-gold-600 transition-all transform group-hover:translate-x-1" />
+                        </div>
                       </div>
                     ))}
                     {filteredSurowce.length === 0 && (

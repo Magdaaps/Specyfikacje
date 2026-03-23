@@ -94,6 +94,14 @@ def read_surowiec(surowiec_id: int, db: Session = Depends(get_db)):
 def update_surowiec(surowiec_id: int, surowiec: schemas.SurowiecCreate, db: Session = Depends(get_db)):
     return crud.update_surowiec(db=db, surowiec_id=surowiec_id, surowiec=surowiec)
 
+@app.delete("/surowce/{surowiec_id}")
+def delete_surowiec(surowiec_id: int, db: Session = Depends(get_db)):
+    db_surowiec = crud.delete_surowiec(db=db, surowiec_id=surowiec_id)
+    if db_surowiec is None:
+        raise HTTPException(status_code=404, detail="Surowiec not found")
+    logger.info(f"DB: Deleted surowiec id={surowiec_id}")
+    return {"ok": True}
+
 # --- PRODUKTY ---
 # Sentinel for products with empty-string EAN (primary key = "").
 # Frontend passes "~" when item.ean is empty; backend decodes it back to "".
