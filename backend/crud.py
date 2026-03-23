@@ -45,6 +45,7 @@ def update_surowiec(db: Session, surowiec_id: int, surowiec: schemas.SurowiecCre
 def delete_surowiec(db: Session, surowiec_id: int):
     db_surowiec = get_surowiec(db, surowiec_id)
     if db_surowiec:
+        db.query(models.SkladnikProduktu).filter(models.SkladnikProduktu.surowiec_id == surowiec_id).delete()
         db.delete(db_surowiec)
         db.commit()
     return db_surowiec
