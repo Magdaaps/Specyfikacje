@@ -4,7 +4,7 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || ""
 
-export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec }) {
+export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec, categories = [] }) {
     // Initial state setup with JSON parsing for complex fields
     const emptyDefaults = {
         nazwa: '',
@@ -60,6 +60,10 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec 
     const [formData, setFormData] = useState(getInitialData())
     const [loading, setLoading] = useState(false)
     const [activeSection, setActiveSection] = useState('osobowe')
+
+    const categoryOptions = Array.from(new Set([...categories, 'Inne']))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'pl'))
 
     const [skladnikiProcenty, setSkladnikiProcenty] = useState([])
     const [skladnikiKraje, setSkladnikiKraje] = useState([])
@@ -209,13 +213,17 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec 
                             </div>
                             <div className="col-span-2 md:col-span-1">
                                 <label className="block text-[10px] font-black text-choco-500 uppercase tracking-widest mb-2">Kategoria</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-choco-50/50 border border-choco-100 rounded-2xl px-5 py-3.5 focus:ring-4 focus:ring-choco-100/50 outline-none transition-all placeholder:text-choco-400 font-bold text-choco-900"
+                                <select
+                                    className="w-full bg-choco-50/50 border border-choco-100 rounded-2xl px-5 py-3.5 focus:ring-4 focus:ring-choco-100/50 outline-none transition-all font-bold text-choco-900"
                                     value={formData.kategoria}
                                     onChange={(e) => setFormData({ ...formData, kategoria: e.target.value })}
-                                    placeholder="np. Master Martini"
-                                />
+                                >
+                                    {categoryOptions.map((category) => (
+                                        <option key={category} value={category}>
+                                            {category}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="col-span-2">
                                 <div className="flex justify-between items-center mb-2">

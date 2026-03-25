@@ -600,6 +600,7 @@ function App() {
 
         {(showAddSurowiecModal || editingSurowiec) && (
           <AddSurowiecModal
+            categories={categories.map(c => c.name)}
             surowiec={editingSurowiec}
             onClose={() => {
               setShowAddSurowiecModal(false)
