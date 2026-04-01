@@ -613,6 +613,7 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
     # Product image
     product_image_html = ""
     if produkt.image_url:
+        logger.info("PDF image_url for EAN %s: %r", produkt.ean, produkt.image_url)
         try:
             import base64 as _b64, mimetypes as _mt
             _img_url = produkt.image_url
@@ -621,18 +622,21 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
                 _resp = _httpx.get(_img_url, timeout=15, follow_redirects=True)
                 _resp.raise_for_status()
                 _img_data = _resp.content
-                _img_mime = _mt.guess_type(_img_url)[0] or "image/jpeg"
+                _img_mime = _resp.headers.get("content-type", "").split(";")[0] or _mt.guess_type(_img_url)[0] or "image/jpeg"
+                logger.info("PDF image fetched OK: %d bytes, mime=%s", len(_img_data), _img_mime)
             else:
                 # Local filesystem fallback (development)
                 _img_abs = os.path.join(base_dir, _img_url.lstrip("/"))
                 with open(_img_abs, "rb") as _f:
                     _img_data = _f.read()
                 _img_mime = _mt.guess_type(_img_abs)[0] or "image/jpeg"
+                logger.info("PDF image from filesystem: %d bytes, mime=%s", len(_img_data), _img_mime)
             _img_b64 = _b64.b64encode(_img_data).decode()
             _img_src = f"data:{_img_mime};base64,{_img_b64}"
             product_image_html = f'<div style="text-align: center; margin-top: 15pt; margin-bottom: 15pt;"><img src="{_img_src}" style="max-width: 200pt; max-height: 200pt;"></div>'
+            logger.info("PDF product_image_html set (%d chars)", len(product_image_html))
         except Exception as _e:
-            logger.warning("Could not embed product image: %s", _e)
+            logger.warning("Could not embed product image (url=%r): %s", produkt.image_url, _e)
 
     _register_fonts()
 
