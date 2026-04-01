@@ -833,7 +833,7 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
         <div class="section-header">1. {_s('DANE OGÓLNE')}</div>
 
         <table class="no-border" style="margin-bottom: 15pt;">
-            <tr><td class="label" style="width: 35%;">{_f('Kod produktu / ID')}:</td><td>{produkt.internal_id or (produkt.ean[-6:] if produkt.ean else '-')}</td></tr>
+            <tr><td class="label" style="width: 35%;">{_f('Kod produktu / ID')}:</td><td>{(produkt.ean[-6:] if produkt.ean else None) or produkt.internal_id or '-'}</td></tr>
             <tr><td class="label">{_f('Data utworzenia')}:</td><td>{datetime.now().strftime('%d.%m.%Y')}</td></tr>
             <tr><td class="label">{_f('Kod EAN sztuki')}:</td><td>{produkt.ean or '-'}</td></tr>
             <tr><td class="label">{_f('Kod EAN kartonu')}:</td><td>{produkt.ean_karton or '-'}</td></tr>
