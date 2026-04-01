@@ -614,12 +614,13 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
     product_image_html = ""
     if produkt.image_url:
         try:
-            import base64 as _b64, mimetypes as _mt, urllib.request as _req
+            import base64 as _b64, mimetypes as _mt
             _img_url = produkt.image_url
             if _img_url.startswith("http://") or _img_url.startswith("https://"):
-                # Cloud storage URL (Supabase etc.)
-                with _req.urlopen(_img_url, timeout=10) as _resp:
-                    _img_data = _resp.read()
+                import httpx as _httpx
+                _resp = _httpx.get(_img_url, timeout=15, follow_redirects=True)
+                _resp.raise_for_status()
+                _img_data = _resp.content
                 _img_mime = _mt.guess_type(_img_url)[0] or "image/jpeg"
             else:
                 # Local filesystem fallback (development)
