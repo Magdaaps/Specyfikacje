@@ -62,6 +62,7 @@ def aggregate_allergens(produkt: models.Produkt):
     return allergens
 
 def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=None):
+    # key: normalized (lowercase), value: [display_name, total_percent]
     total_ingredients = {}
 
     def _t(name):
@@ -69,6 +70,15 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
         if lang == "en" and translate_fn:
             return translate_fn(name)
         return name
+
+    def _add(name, contribution):
+        key = name.lower().strip()
+        if key in total_ingredients:
+            prev_display, prev_total = total_ingredients[key]
+            display = name if contribution > prev_total else prev_display
+            total_ingredients[key] = [display, prev_total + contribution]
+        else:
+            total_ingredients[key] = [name, contribution]
 
     for s in produkt.skladniki:
         raw_material_percent = s.procent
@@ -88,8 +98,7 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
                             continue
                         name = _t(name)
                         contribution = (percent / 100.0) * raw_material_percent
-
-                        total_ingredients[name] = total_ingredients.get(name, 0) + contribution
+                        _add(name, contribution)
                         ingredients_found = True
             except (json.JSONDecodeError, ValueError):
                 pass
@@ -100,10 +109,13 @@ def generate_ingredients_text(produkt: models.Produkt, lang="pl", translate_fn=N
                 name = s.surowiec.nazwa_en or _t(s.surowiec.nazwa)
             else:
                 name = s.surowiec.nazwa
-            total_ingredients[name] = total_ingredients.get(name, 0) + raw_material_percent
+            _add(name, raw_material_percent)
 
     # Sort ingredients by percentage descending (stable sort preserves insertion order for ties)
-    sorted_ingredients = sorted(total_ingredients.items(), key=lambda x: x[1], reverse=True)
+    sorted_ingredients = sorted(
+        ((display, total) for display, total in total_ingredients.values()),
+        key=lambda x: x[1], reverse=True
+    )
 
     # Group entries that share a "prefix: identifier" pattern (e.g. multiple barwnik: Exx)
     prefix_groups = {}  # prefix -> [(identifier, percent)]  — preserves sorted order
