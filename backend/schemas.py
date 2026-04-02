@@ -88,6 +88,7 @@ class ProduktBase(BaseModel):
     wyrazenie_format_daty: Optional[str] = None
     informacje_dodatkowe: Optional[str] = None
     alergeny: Optional[str] = None
+    sklad_text: Optional[str] = None
     
     # Nowe pola
     kod_cn: Optional[str] = None

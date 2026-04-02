@@ -589,11 +589,18 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
     nutrition = logic.calculate_nutrition(produkt)
     allergens = logic.aggregate_allergens(produkt)
     ingredients_text = logic.generate_ingredients_text(produkt, lang=lang)
-    # Strip percentage annotations for the declared-composition display
-    ingredients_text_pdf = re.sub(r'\s*\(\d+(?:\.\d+)?%\)', '', ingredients_text) if ingredients_text else ''
-    # For EN: translate any remaining Polish ingredient names using the master dict
-    if lang == "en":
-        ingredients_text_pdf = _translate_any_text(ingredients_text_pdf)
+    # If a manual override is set, use it directly (strip percentages like auto-text)
+    manual_sklad = getattr(produkt, 'sklad_text', None)
+    if manual_sklad:
+        ingredients_text_pdf = re.sub(r'\s*\(\d+(?:\.\d+)?%\)', '', manual_sklad)
+        if lang == "en":
+            ingredients_text_pdf = _translate_any_text(ingredients_text_pdf)
+    else:
+        # Strip percentage annotations for the declared-composition display
+        ingredients_text_pdf = re.sub(r'\s*\(\d+(?:\.\d+)?%\)', '', ingredients_text) if ingredients_text else ''
+        # For EN: translate any remaining Polish ingredient names using the master dict
+        if lang == "en":
+            ingredients_text_pdf = _translate_any_text(ingredients_text_pdf)
     ingredients_text_pdf = _bold_allergens_html(ingredients_text_pdf, lang=lang)
     ingredient_origins = logic.get_ingredient_origins(produkt)
 

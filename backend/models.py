@@ -76,6 +76,7 @@ class Produkt(Base):
     wyrazenie_format_daty = Column(String)
     informacje_dodatkowe = Column(String)
     alergeny = Column(String) # JSON z manualnie ustawionymi statusami alergenów
+    sklad_text = Column(String) # Ręcznie edytowany tekst składu (nadpisuje auto-generowanie)
     
     # Rozszerzenie Dane Ogólne
     kod_cn = Column(String)

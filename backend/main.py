@@ -24,6 +24,22 @@ logger = logging.getLogger("generator-api")
 
 models.Base.metadata.create_all(bind=engine)
 
+# Migracje kolumn dodanych po pierwszym create_all
+def _run_migrations():
+    with engine.connect() as conn:
+        from sqlalchemy import text as sa_text
+        try:
+            conn.execute(sa_text("ALTER TABLE produkty ADD COLUMN IF NOT EXISTS sklad_text TEXT"))
+            conn.commit()
+        except Exception:
+            try:
+                conn.execute(sa_text("ALTER TABLE produkty ADD COLUMN sklad_text TEXT"))
+                conn.commit()
+            except Exception:
+                pass  # Kolumna już istnieje
+
+_run_migrations()
+
 app = FastAPI(title="Generator Kart Produktów 2.0 API")
 
 app.add_middleware(
@@ -119,7 +135,10 @@ def read_produkty(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 def update_produkt(ean: str, produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
     ean = _decode_ean(ean)
     logger.info(f"DB: UPDATING PRODUCT (PUT) EAN: {ean!r}")
-    return crud.update_produkt(db=db, ean=ean, produkt=produkt)
+    db_produkt = crud.update_produkt(db=db, ean=ean, produkt=produkt)
+    if db_produkt is None:
+        raise HTTPException(status_code=404, detail="Produkt not found")
+    return db_produkt
 
 @app.patch("/produkty/{ean}/image")
 def update_product_image(ean: str, image_url: Optional[str] = Body(None, embed=True), db: Session = Depends(get_db)):

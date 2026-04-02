@@ -12,7 +12,10 @@ import {
     AlertCircle,
     Cloud,
     Camera,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Pencil,
+    RotateCcw,
+    Check
 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE || ""
@@ -77,6 +80,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const [showAddMenu, setShowAddMenu] = useState(false)
     const [suggestions, setSuggestions] = useState({})
     const [imgHeaderFailed, setImgHeaderFailed] = useState(false)
+    const [editingSklad, setEditingSklad] = useState(false)
+    const [skladTextEdit, setSkladTextEdit] = useState('')
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
     const lastSavedEanRef = useRef(ean) // tracks the EAN currently in DB (may differ from prop after EAN change)
@@ -350,6 +355,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                 kod_cn: product.kod_cn,
                 kod_pkwiu: product.kod_pkwiu,
                 certyfikaty: typeof product.certyfikaty === 'string' ? product.certyfikaty : JSON.stringify(product.certyfikaty || []),
+                sklad_text: product.sklad_text || null,
                 logistyka_wymiary_solo_h: n(product.logistyka_wymiary_solo_h),
                 logistyka_wymiary_solo_w: n(product.logistyka_wymiary_solo_w),
                 logistyka_wymiary_solo_d: n(product.logistyka_wymiary_solo_d),
@@ -985,11 +991,30 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
                                 {/* Ingr List */}
                                 <div className="pt-8 border-t border-choco-100">
-                                    <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4">Skład</h4>
-                                    <div
-                                        className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic"
-                                        dangerouslySetInnerHTML={{ __html: boldAllergens(liveIngredientsText || analysis?.ingredients_pl || '') }}
-                                    />
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest">Skład</h4>
+                                            {product.sklad_text && <span className="text-[9px] font-bold text-gold-600 uppercase tracking-widest bg-gold-50 border border-gold-200 px-2 py-0.5 rounded-full">ręcznie</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {editingSklad ? (
+                                                <>
+                                                    <button onClick={() => { setProduct(p => ({ ...p, sklad_text: skladTextEdit || null })); setEditingSklad(false) }} className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded-lg transition-colors"><Check className="w-3 h-3" />Zatwierdź</button>
+                                                    <button onClick={() => setEditingSklad(false)} className="flex items-center gap-1 text-[10px] font-bold text-choco-500 hover:text-choco-700 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors"><X className="w-3 h-3" />Anuluj</button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => { setSkladTextEdit(product.sklad_text || liveIngredientsText || ''); setEditingSklad(true) }} className="flex items-center gap-1 text-[10px] font-bold text-choco-500 hover:text-choco-700 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors"><Pencil className="w-3 h-3" />Edytuj</button>
+                                                    {product.sklad_text && <button onClick={() => setProduct(p => ({ ...p, sklad_text: null }))} className="flex items-center gap-1 text-[10px] font-bold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors"><RotateCcw className="w-3 h-3" />Przywróć auto</button>}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {editingSklad ? (
+                                        <textarea value={skladTextEdit} onChange={e => setSkladTextEdit(e.target.value)} className="w-full p-6 bg-white rounded-2xl border-2 border-gold-300 focus:border-gold-500 outline-none text-sm text-choco-700 leading-relaxed italic resize-none shadow-inner" rows={6} placeholder="Wpisz skład ręcznie..." />
+                                    ) : (
+                                        <div className="p-6 bg-white rounded-2xl border border-choco-100 text-sm text-choco-700 leading-relaxed shadow-inner italic" dangerouslySetInnerHTML={{ __html: boldAllergens(product.sklad_text || liveIngredientsText || analysis?.ingredients_pl || '') }} />
+                                    )}
                                 </div>
 
                                 {/* Percentage and Origins List */}
