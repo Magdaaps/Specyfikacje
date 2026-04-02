@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response, File, UploadFile, Body
@@ -271,8 +272,14 @@ def analyze_product(ean: str, db: Session = Depends(get_db)):
         allergens = logic.aggregate_allergens(db_produkt)
         sklad_pl = logic.generate_ingredients_text(db_produkt, lang="pl")
         sklad_en = logic.generate_ingredients_text(db_produkt, lang="en")
-        ingredient_origins = logic.get_ingredient_origins(db_produkt)
-        
+        if db_produkt.origins_override:
+            try:
+                ingredient_origins = json.loads(db_produkt.origins_override)
+            except Exception:
+                ingredient_origins = logic.get_ingredient_origins(db_produkt)
+        else:
+            ingredient_origins = logic.get_ingredient_origins(db_produkt)
+
         return {
             "ean": ean,
             "nutrition": nutrition,

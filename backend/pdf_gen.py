@@ -602,7 +602,13 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
         if lang == "en":
             ingredients_text_pdf = _translate_any_text(ingredients_text_pdf)
     ingredients_text_pdf = _bold_allergens_html(ingredients_text_pdf, lang=lang)
-    ingredient_origins = logic.get_ingredient_origins(produkt)
+    if produkt.origins_override:
+        try:
+            ingredient_origins = json.loads(produkt.origins_override)
+        except Exception:
+            ingredient_origins = logic.get_ingredient_origins(produkt)
+    else:
+        ingredient_origins = logic.get_ingredient_origins(produkt)
 
     # Parse certs
     certs = []

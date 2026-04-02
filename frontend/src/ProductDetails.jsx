@@ -17,6 +17,7 @@ import {
     RotateCcw,
     Check
 } from 'lucide-react'
+import OriginsRow from './OriginsRow'
 
 const API_BASE = import.meta.env.VITE_API_BASE || ""
 
@@ -82,6 +83,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const [imgHeaderFailed, setImgHeaderFailed] = useState(false)
     const [editingSklad, setEditingSklad] = useState(false)
     const [skladTextEdit, setSkladTextEdit] = useState('')
+    const [editingOriginIdx, setEditingOriginIdx] = useState(null)
+    const [editingOriginData, setEditingOriginData] = useState(null)
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
     const lastSavedEanRef = useRef(ean) // tracks the EAN currently in DB (may differ from prop after EAN change)
@@ -356,6 +359,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                 kod_pkwiu: product.kod_pkwiu,
                 certyfikaty: typeof product.certyfikaty === 'string' ? product.certyfikaty : JSON.stringify(product.certyfikaty || []),
                 sklad_text: product.sklad_text || null,
+                origins_override: product.origins_override || null,
                 logistyka_wymiary_solo_h: n(product.logistyka_wymiary_solo_h),
                 logistyka_wymiary_solo_w: n(product.logistyka_wymiary_solo_w),
                 logistyka_wymiary_solo_d: n(product.logistyka_wymiary_solo_d),
@@ -1019,31 +1023,37 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
 
                                 {/* Percentage and Origins List */}
                                 <div className="pt-8 border-t border-choco-100">
-                                    <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                        <Info className="w-3 h-3 text-gold-600" />
-                                        Procentowy udział składników w produkcji i ich kraje pochodzenia
-                                    </h4>
-                                    <div className="space-y-1">
-                                        {analysis?.ingredient_origins?.map((item, idx) => (
-                                            <div key={idx} className="flex items-center gap-3 py-2.5 px-4 bg-white border border-choco-50 rounded-xl hover:border-gold-200 transition-colors group">
-                                                <span className="font-bold text-choco-800 group-hover:text-choco-950 transition-colors">
-                                                    {item.name}
-                                                </span>
-                                                <span className="text-choco-300">—</span>
-                                                <span className="font-black text-gold-600 w-20 text-center">
-                                                    {fmtPct(item.percent)}%
-                                                </span>
-                                                <span className="text-choco-300">—</span>
-                                                <span className="text-choco-500 italic font-medium flex-1">
-                                                    {item.countries.join(', ') || 'brak danych'}
-                                                </span>
-                                            </div>
-                                        ))}
-                                        {(!analysis?.ingredient_origins || analysis.ingredient_origins.length === 0) && (
-                                            <div className="text-center py-8 text-choco-300 text-[10px] font-bold uppercase tracking-widest border-2 border-dashed border-choco-50 rounded-2xl">
-                                                Brak danych do wygenerowania zestawienia
-                                            </div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-[10px] font-black text-choco-600 uppercase tracking-widest flex items-center gap-2">
+                                            <Info className="w-3 h-3 text-gold-600" />
+                                            Procentowy udział składników w produkcji i ich kraje pochodzenia
+                                            {product?.origins_override && <span className="text-[9px] font-bold text-gold-600 bg-gold-50 border border-gold-200 px-2 py-0.5 rounded-full">ręcznie</span>}
+                                        </h4>
+                                        {product?.origins_override && (
+                                            <button onClick={() => { setProduct({ ...product, origins_override: null }); setEditingOriginIdx(null) }}
+                                                className="flex items-center gap-1 text-[10px] font-bold text-choco-400 hover:text-choco-600 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors">
+                                                <RotateCcw className="w-3 h-3" />Reset do auto
+                                            </button>
                                         )}
+                                    </div>
+                                    <div className="space-y-1">
+                                        {(() => {
+                                            const origins = product?.origins_override ? (() => { try { return JSON.parse(product.origins_override) } catch { return [] } })() : (analysis?.ingredient_origins || [])
+                                            if (origins.length === 0) return <div className="text-center py-8 text-choco-300 text-[10px] font-bold uppercase tracking-widest border-2 border-dashed border-choco-50 rounded-2xl">Brak danych do wygenerowania zestawienia</div>
+                                            return origins.map((item, idx) => (
+                                                <OriginsRow
+                                                    key={idx}
+                                                    item={item}
+                                                    isEditing={editingOriginIdx === idx}
+                                                    editingData={editingOriginData}
+                                                    onEdit={() => { setEditingOriginIdx(idx); setEditingOriginData({ name: item.name, percent: item.percent, countries_str: item.countries.join(', ') }) }}
+                                                    onDelete={() => { const u = origins.filter((_, i) => i !== idx); setProduct({ ...product, origins_override: JSON.stringify(u) }); if (editingOriginIdx === idx) { setEditingOriginIdx(null); setEditingOriginData(null) } }}
+                                                    onSave={() => { const u = [...origins]; u[idx] = { name: editingOriginData.name, percent: parseFloat(editingOriginData.percent) || 0, countries: editingOriginData.countries_str.split(',').map(c => c.trim()).filter(Boolean) }; setProduct({ ...product, origins_override: JSON.stringify(u) }); setEditingOriginIdx(null); setEditingOriginData(null) }}
+                                                    onCancel={() => { setEditingOriginIdx(null); setEditingOriginData(null) }}
+                                                    onEditDataChange={(field, value) => setEditingOriginData(prev => ({ ...prev, [field]: value }))}
+                                                />
+                                            ))
+                                        })()}
                                     </div>
                                 </div>
                             </div>

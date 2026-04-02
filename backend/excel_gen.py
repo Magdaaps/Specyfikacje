@@ -180,7 +180,13 @@ def generate_product_card(db_produkt: models.Produkt, lang="pl"):
     ws[f'C{row}'].font = Font(bold=True, size=9)
     row += 1
 
-    ingredient_origins = logic.get_ingredient_origins(db_produkt, translate_fn=_t if lang == "en" else None)
+    if db_produkt.origins_override:
+        try:
+            ingredient_origins = json.loads(db_produkt.origins_override)
+        except Exception:
+            ingredient_origins = logic.get_ingredient_origins(db_produkt, translate_fn=_t if lang == "en" else None)
+    else:
+        ingredient_origins = logic.get_ingredient_origins(db_produkt, translate_fn=_t if lang == "en" else None)
     for item in ingredient_origins:
         ws[f'A{row}'] = item['name']
         ws[f'B{row}'] = f"{str(round(item['percent'], 2)).replace('.', ',')}%"

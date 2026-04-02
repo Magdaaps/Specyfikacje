@@ -77,6 +77,7 @@ class Produkt(Base):
     informacje_dodatkowe = Column(String)
     alergeny = Column(String) # JSON z manualnie ustawionymi statusami alergenów
     sklad_text = Column(String) # Ręcznie edytowany tekst składu (nadpisuje auto-generowanie)
+    origins_override = Column(String) # JSON: lista [{name, percent, countries}] nadpisująca auto-obliczone pochodzenie
     
     # Rozszerzenie Dane Ogólne
     kod_cn = Column(String)
