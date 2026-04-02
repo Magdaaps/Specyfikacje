@@ -85,6 +85,10 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const [skladTextEdit, setSkladTextEdit] = useState('')
     const [editingOriginIdx, setEditingOriginIdx] = useState(null)
     const [editingOriginData, setEditingOriginData] = useState(null)
+
+    const patchOriginsOverride = (val) => {
+        axios.patch(`${API_BASE}/produkty/${lastSavedEanRef.current}/origins_override`, { origins_override: val }).catch(() => {})
+    }
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
     const lastSavedEanRef = useRef(ean) // tracks the EAN currently in DB (may differ from prop after EAN change)
@@ -1030,7 +1034,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             {product?.origins_override && <span className="text-[9px] font-bold text-gold-600 bg-gold-50 border border-gold-200 px-2 py-0.5 rounded-full">ręcznie</span>}
                                         </h4>
                                         {product?.origins_override && (
-                                            <button onClick={() => { setProduct({ ...product, origins_override: null }); setEditingOriginIdx(null) }}
+                                            <button onClick={() => { setProduct({ ...product, origins_override: null }); patchOriginsOverride(null); setEditingOriginIdx(null) }}
                                                 className="flex items-center gap-1 text-[10px] font-bold text-choco-400 hover:text-choco-600 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors">
                                                 <RotateCcw className="w-3 h-3" />Reset do auto
                                             </button>
@@ -1047,8 +1051,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                     isEditing={editingOriginIdx === idx}
                                                     editingData={editingOriginData}
                                                     onEdit={() => { setEditingOriginIdx(idx); setEditingOriginData({ name: item.name, percent: item.percent, countries_str: item.countries.join(', ') }) }}
-                                                    onDelete={() => { const u = origins.filter((_, i) => i !== idx); setProduct({ ...product, origins_override: JSON.stringify(u) }); if (editingOriginIdx === idx) { setEditingOriginIdx(null); setEditingOriginData(null) } }}
-                                                    onSave={() => { const u = [...origins]; u[idx] = { name: editingOriginData.name, percent: parseFloat(editingOriginData.percent) || 0, countries: editingOriginData.countries_str.split(',').map(c => c.trim()).filter(Boolean) }; setProduct({ ...product, origins_override: JSON.stringify(u) }); setEditingOriginIdx(null); setEditingOriginData(null) }}
+                                                    onDelete={() => { const u = origins.filter((_, i) => i !== idx); const j = JSON.stringify(u); setProduct({ ...product, origins_override: j }); patchOriginsOverride(j); if (editingOriginIdx === idx) { setEditingOriginIdx(null); setEditingOriginData(null) } }}
+                                                    onSave={() => { const u = [...origins]; u[idx] = { name: editingOriginData.name, percent: parseFloat(editingOriginData.percent) || 0, countries: editingOriginData.countries_str.split(',').map(c => c.trim()).filter(Boolean) }; const j = JSON.stringify(u); setProduct({ ...product, origins_override: j }); patchOriginsOverride(j); setEditingOriginIdx(null); setEditingOriginData(null) }}
                                                     onCancel={() => { setEditingOriginIdx(null); setEditingOriginData(null) }}
                                                     onEditDataChange={(field, value) => setEditingOriginData(prev => ({ ...prev, [field]: value }))}
                                                 />

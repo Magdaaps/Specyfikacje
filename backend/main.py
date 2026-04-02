@@ -348,6 +348,16 @@ def update_sklad_text(ean: str, body: dict = Body(...), db: Session = Depends(ge
     db.commit()
     return {"ok": True}
 
+@app.patch("/produkty/{ean}/origins_override")
+def update_origins_override(ean: str, body: dict = Body(...), db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
+    db_produkt = crud.get_produkt(db, ean=ean)
+    if not db_produkt:
+        raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
+    db_produkt.origins_override = body.get("origins_override") or None
+    db.commit()
+    return {"ok": True}
+
 @app.get("/produkty/{ean}/pdf")
 def download_pdf(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
     ean = _decode_ean(ean)
