@@ -331,6 +331,16 @@ def sync_to_sharepoint(ean: str, folder: str, lang: str = "pl", db: Session = De
         logger.error(f"SharePoint sync failed for EAN {ean}: {e}")
         raise exceptions.SharePointError(f"Failed to sync with SharePoint: {str(e)}")
 
+@app.patch("/produkty/{ean}/sklad_text")
+def update_sklad_text(ean: str, body: dict = Body(...), db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
+    db_produkt = crud.get_produkt(db, ean=ean)
+    if not db_produkt:
+        raise exceptions.DataNotFoundError(f"Produkt with EAN {ean} not found")
+    db_produkt.sklad_text = body.get("sklad_text") or None
+    db.commit()
+    return {"ok": True}
+
 @app.get("/produkty/{ean}/pdf")
 def download_pdf(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
     ean = _decode_ean(ean)
