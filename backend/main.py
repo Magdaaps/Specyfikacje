@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 import time
+import unicodedata
 from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response, File, UploadFile, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -388,16 +390,40 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SUPABASE_BUCKET = "product-images"
 
+def _sanitize_filename(filename: str) -> str:
+    """Sanitize filename for Supabase Storage: remove non-ASCII, spaces, duplicate extensions."""
+    # Extract the last (real) extension
+    name, ext = os.path.splitext(filename)
+    # If the stem still has extensions (e.g. "foo.jpg2.jpg3" → stem="foo.jpg2", ext=".jpg3"),
+    # strip all intermediate extensions from the stem too
+    while True:
+        stem, mid_ext = os.path.splitext(name)
+        if mid_ext:
+            name = stem
+        else:
+            break
+    # Normalize unicode (ą→a, ł→l, etc.)
+    name = unicodedata.normalize("NFKD", name)
+    name = name.encode("ascii", "ignore").decode("ascii")
+    # Replace spaces and unsafe chars with underscores
+    name = re.sub(r"[^\w.-]", "_", name)
+    name = re.sub(r"_+", "_", name).strip("_")
+    if not name:
+        name = "image"
+    return name + ext.lower()
+
+
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
     content = await file.read()
+    safe_filename = _sanitize_filename(file.filename or "image.jpg")
 
     if SUPABASE_URL and SUPABASE_SERVICE_KEY:
         import httpx
-        storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{file.filename}"
+        storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{safe_filename}"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
@@ -418,12 +444,12 @@ async def upload_image(file: UploadFile = File(...)):
         if resp.status_code not in (200, 201):
             logger.error(f"Supabase Storage upload failed: {resp.status_code} {resp.text}")
             raise HTTPException(status_code=500, detail=f"Supabase Storage odmówił uploadu ({resp.status_code}): {resp.text[:200]}")
-        public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{file.filename}"
+        public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{safe_filename}"
         logger.info(f"Image uploaded to Supabase Storage: {public_url}")
         return {"url": public_url}
     else:
         # Fallback: local filesystem (development)
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        file_path = os.path.join(UPLOAD_DIR, safe_filename)
         with open(file_path, "wb") as buffer:
             buffer.write(content)
-        return {"url": f"/uploads/{file.filename}"}
+        return {"url": f"/uploads/{safe_filename}"}
