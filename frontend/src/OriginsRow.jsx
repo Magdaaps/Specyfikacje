@@ -1,6 +1,11 @@
 import { Pencil, Trash2, X, Check } from 'lucide-react'
 
-const fmtPct = v => (v === 0 || v === '0' ? '0%' : (Number(v) || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 }) + '%')
+const fmtPct = v => {
+  const num = Number(v) || 0
+  if (num === 0) return '0%'
+  const decimals = Math.max(2, Math.ceil(-Math.log10(Math.abs(num))) + 1)
+  return num.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',') + '%'
+}
 
 export default function OriginsRow({ item, isEditing, editingData, onEdit, onDelete, onSave, onCancel, onEditDataChange }) {
   if (isEditing) return <div className="flex gap-3 items-center p-3 rounded-2xl border-2 border-gold-300 bg-gold-50/60"><input value={editingData.name} onChange={e => onEditDataChange('name', e.target.value)} placeholder="Składnik" className="w-1/3 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 focus:outline-none focus:ring-2 focus:ring-gold-300" /><input value={editingData.percent} onChange={e => onEditDataChange('percent', e.target.value)} placeholder="%" className="w-24 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 text-center focus:outline-none focus:ring-2 focus:ring-gold-300" /><input value={editingData.countries_str} onChange={e => onEditDataChange('countries_str', e.target.value)} placeholder="Kraje pochodzenia" className="flex-1 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 focus:outline-none focus:ring-2 focus:ring-gold-300" /><button onClick={onSave} className="flex items-center gap-1 text-[10px] font-bold text-gold-700 bg-white hover:bg-gold-100 border border-gold-300 px-2.5 py-2 rounded-lg transition-colors"><Check className="w-3 h-3" />Zapisz</button><button onClick={onCancel} className="flex items-center gap-1 text-[10px] font-bold text-choco-600 bg-white hover:bg-choco-50 border border-choco-200 px-2.5 py-2 rounded-lg transition-colors"><X className="w-3 h-3" />Anuluj</button></div>

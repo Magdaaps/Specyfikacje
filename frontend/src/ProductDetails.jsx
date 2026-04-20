@@ -62,12 +62,10 @@ function boldAllergens(text) {
 }
 
 function fmtPct(p) {
-    if (p >= 1)      return p.toFixed(1).replace('.', ',')
-    if (p >= 0.01)   return (Math.round(p * 100) / 100).toString().replace('.', ',')
-    if (p >= 0.001)  return (Math.round(p * 1000) / 1000).toString().replace('.', ',')
-    if (p >= 0.0001) return (Math.round(p * 10000) / 10000).toString().replace('.', ',')
-    if (p > 0)       return (Math.round(p * 100000) / 100000).toString().replace('.', ',')
-    return '0'
+    if (p <= 0) return '0'
+    if (p >= 1) return p.toFixed(1).replace('.', ',')
+    const decimals = Math.max(2, Math.ceil(-Math.log10(p)) + 1)
+    return p.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',')
 }
 
 export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
