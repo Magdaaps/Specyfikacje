@@ -1040,7 +1040,20 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                     </div>
                                     <div className="space-y-1">
                                         {(() => {
-                                            const origins = product?.origins_override ? (() => { try { return JSON.parse(product.origins_override) } catch { return [] } })() : (analysis?.ingredient_origins || [])
+                                            const _parseOrigins = (raw) => { try { return JSON.parse(raw) } catch { return [] } }
+                                            const _mergePercents = (overrideItems, freshItems) => {
+                                                const freshMap = {}
+                                                for (const a of (freshItems || [])) freshMap[a.name.toLowerCase()] = a.percent
+                                                return overrideItems.map(item => {
+                                                    const s = String(item.percent ?? '')
+                                                    if (s.startsWith('<') || s.startsWith('>')) return item
+                                                    const num = Number(s.replace(',', '.'))
+                                                    if (num > 0) return item
+                                                    const fresh = freshMap[item.name.toLowerCase()]
+                                                    return fresh > 0 ? { ...item, percent: fresh } : item
+                                                }).filter(item => { const s = String(item.percent ?? ''); return s.startsWith('<') || s.startsWith('>') || Number(s.replace(',', '.')) > 0 })
+                                            }
+                                            const origins = product?.origins_override ? _mergePercents(_parseOrigins(product.origins_override), analysis?.ingredient_origins) : (analysis?.ingredient_origins || [])
                                             if (origins.length === 0) return <div className="text-center py-8 text-choco-300 text-[10px] font-bold uppercase tracking-widest border-2 border-dashed border-choco-50 rounded-2xl">Brak danych do wygenerowania zestawienia</div>
                                             return origins.map((item, idx) => (
                                                 <OriginsRow

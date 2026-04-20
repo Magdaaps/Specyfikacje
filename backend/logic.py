@@ -241,15 +241,18 @@ def get_ingredient_origins(produkt: models.Produkt, translate_fn=None):
                 for c in kraje:
                     aggregation[display_name]["countries"].add(c)
 
-    # Convert to sorted list
+    # Convert to sorted list, excluding items with 0 contribution
     result = []
     for name, data in aggregation.items():
+        pct = round(data["percent"], 6)
+        if pct <= 0:
+            continue
         result.append({
             "name": name,
-            "percent": round(data["percent"], 6),
+            "percent": pct,
             "countries": sorted(list(data["countries"]))
         })
-    
+
     result.sort(key=lambda x: x["percent"], reverse=True)
     return result
 
