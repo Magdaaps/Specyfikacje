@@ -1,26 +1,23 @@
 import { Pencil, Trash2, X, Check } from 'lucide-react'
 
 const fmtPct = v => {
-  const num = Number(v) || 0
-  if (num === 0) return '0%'
+  const str = String(v || '')
+  const prefix = (str.startsWith('<') || str.startsWith('>')) ? str[0] : ''
+  const num = Number(str.replace(/[<>]/g, '').replace(',', '.')) || 0
+  if (num === 0) return prefix + '0%'
   const decimals = Math.max(2, Math.ceil(-Math.log10(Math.abs(num))) + 1)
-  return num.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',') + '%'
+  return prefix + num.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',') + '%'
 }
 
 export default function OriginsRow({ item, isEditing, editingData, onEdit, onDelete, onSave, onCancel, onEditDataChange }) {
   if (isEditing) return (
     <div className="flex gap-2 items-center p-3 rounded-2xl border-2 border-gold-300 bg-gold-50/60">
       <input value={editingData.name} onChange={e => onEditDataChange('name', e.target.value)} placeholder="Składnik" className="w-1/3 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 focus:outline-none focus:ring-2 focus:ring-gold-300" />
-      <div className="flex items-center gap-0.5">
-        {['', '<', '>'].map(p => (
-          <button key={p || '='} onClick={() => onEditDataChange('prefix', p)} className={`w-7 h-7 rounded-lg text-xs font-black border transition-colors ${editingData.prefix === p ? 'bg-gold-400 border-gold-500 text-white' : 'bg-white border-choco-200 text-choco-500 hover:bg-choco-50'}`}>{p || '='}</button>
-        ))}
-      </div>
-      <input value={editingData.percent} onChange={e => onEditDataChange('percent', e.target.value)} placeholder="%" className="w-20 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 text-center focus:outline-none focus:ring-2 focus:ring-gold-300" />
+      <input value={editingData.percent} onChange={e => onEditDataChange('percent', e.target.value)} placeholder="%" className="w-24 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 text-center focus:outline-none focus:ring-2 focus:ring-gold-300" />
       <input value={editingData.countries_str} onChange={e => onEditDataChange('countries_str', e.target.value)} placeholder="Kraje pochodzenia" className="flex-1 bg-white border border-choco-200 rounded-xl px-4 py-2.5 text-sm font-bold text-choco-800 focus:outline-none focus:ring-2 focus:ring-gold-300" />
       <button onClick={onSave} className="flex items-center gap-1 text-[10px] font-bold text-gold-700 bg-white hover:bg-gold-100 border border-gold-300 px-2.5 py-2 rounded-lg transition-colors"><Check className="w-3 h-3" />Zapisz</button>
       <button onClick={onCancel} className="flex items-center gap-1 text-[10px] font-bold text-choco-600 bg-white hover:bg-choco-50 border border-choco-200 px-2.5 py-2 rounded-lg transition-colors"><X className="w-3 h-3" />Anuluj</button>
     </div>
   )
-  return <div className="group flex gap-3 items-center p-3 rounded-2xl border border-choco-200 bg-white hover:bg-choco-50/40 transition-colors"><div className="flex-1 min-w-0"><p className="text-sm font-black text-choco-800 truncate">{item.name}</p></div><div className="w-20 text-center text-sm font-black text-gold-600">{item.prefix || ''}{fmtPct(item.percent)}</div><div className="flex-1 text-sm font-bold text-choco-600 truncate">{Array.isArray(item.countries) ? item.countries.join(', ') : item.countries}</div><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={onEdit} className="p-2 rounded-lg text-choco-500 hover:text-choco-800 hover:bg-choco-100 transition-colors"><Pencil className="w-4 h-4" /></button><button onClick={onDelete} className="p-2 rounded-lg text-choco-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></div></div>
+  return <div className="group flex gap-3 items-center p-3 rounded-2xl border border-choco-200 bg-white hover:bg-choco-50/40 transition-colors"><div className="flex-1 min-w-0"><p className="text-sm font-black text-choco-800 truncate">{item.name}</p></div><div className="w-20 text-center text-sm font-black text-gold-600">{fmtPct(item.percent)}</div><div className="flex-1 text-sm font-bold text-choco-600 truncate">{Array.isArray(item.countries) ? item.countries.join(', ') : item.countries}</div><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={onEdit} className="p-2 rounded-lg text-choco-500 hover:text-choco-800 hover:bg-choco-100 transition-colors"><Pencil className="w-4 h-4" /></button><button onClick={onDelete} className="p-2 rounded-lg text-choco-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button></div></div>
 }

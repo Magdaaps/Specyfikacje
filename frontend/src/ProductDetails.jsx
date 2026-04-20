@@ -1048,9 +1048,9 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                     item={item}
                                                     isEditing={editingOriginIdx === idx}
                                                     editingData={editingOriginData}
-                                                    onEdit={() => { setEditingOriginIdx(idx); setEditingOriginData({ name: item.name, percent: item.percent, prefix: item.prefix || '', countries_str: item.countries.join(', ') }) }}
+                                                    onEdit={() => { setEditingOriginIdx(idx); setEditingOriginData({ name: item.name, percent: String(item.percent ?? ''), countries_str: item.countries.join(', ') }) }}
                                                     onDelete={() => { const u = origins.filter((_, i) => i !== idx); const j = JSON.stringify(u); setProduct({ ...product, origins_override: j }); patchOriginsOverride(j); if (editingOriginIdx === idx) { setEditingOriginIdx(null); setEditingOriginData(null) } }}
-                                                    onSave={() => { const u = [...origins]; u[idx] = { name: editingOriginData.name, percent: parseFloat(editingOriginData.percent) || 0, prefix: editingOriginData.prefix || '', countries: editingOriginData.countries_str.split(',').map(c => c.trim()).filter(Boolean) }; const j = JSON.stringify(u); setProduct({ ...product, origins_override: j }); patchOriginsOverride(j); setEditingOriginIdx(null); setEditingOriginData(null) }}
+                                                    onSave={() => { const u = [...origins]; u[idx] = { name: editingOriginData.name, percent: editingOriginData.percent.trim(), countries: editingOriginData.countries_str.split(',').map(c => c.trim()).filter(Boolean) }; const j = JSON.stringify(u); setProduct({ ...product, origins_override: j }); patchOriginsOverride(j); setEditingOriginIdx(null); setEditingOriginData(null) }}
                                                     onCancel={() => { setEditingOriginIdx(null); setEditingOriginData(null) }}
                                                     onEditDataChange={(field, value) => setEditingOriginData(prev => ({ ...prev, [field]: value }))}
                                                 />
