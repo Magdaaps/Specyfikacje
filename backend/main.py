@@ -31,15 +31,16 @@ models.Base.metadata.create_all(bind=engine)
 def _run_migrations():
     with engine.connect() as conn:
         from sqlalchemy import text as sa_text
-        try:
-            conn.execute(sa_text("ALTER TABLE produkty ADD COLUMN IF NOT EXISTS sklad_text TEXT"))
-            conn.commit()
-        except Exception:
+        for col in ("sklad_text", "origins_override"):
             try:
-                conn.execute(sa_text("ALTER TABLE produkty ADD COLUMN sklad_text TEXT"))
+                conn.execute(sa_text(f"ALTER TABLE produkty ADD COLUMN IF NOT EXISTS {col} TEXT"))
                 conn.commit()
             except Exception:
-                pass  # Kolumna już istnieje
+                try:
+                    conn.execute(sa_text(f"ALTER TABLE produkty ADD COLUMN {col} TEXT"))
+                    conn.commit()
+                except Exception:
+                    pass  # Kolumna już istnieje
 
 _run_migrations()
 

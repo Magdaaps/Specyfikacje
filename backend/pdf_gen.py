@@ -640,8 +640,8 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
             else:
                 # Local filesystem fallback (development)
                 _img_abs = os.path.join(base_dir, _img_url.lstrip("/"))
-                with open(_img_abs, "rb") as _f:
-                    _img_data = _f.read()
+                with open(_img_abs, "rb") as _img_file:
+                    _img_data = _img_file.read()
                 _img_mime = _mt.guess_type(_img_abs)[0] or "image/jpeg"
                 logger.info("PDF image from filesystem: %d bytes, mime=%s", len(_img_data), _img_mime)
             _img_b64 = _b64.b64encode(_img_data).decode()
