@@ -140,8 +140,12 @@ function App() {
     // Setup Axios Interceptor
     const interceptor = axios.interceptors.response.use(
       response => response,
-      error => {
-        const data = error.response?.data
+      async error => {
+        let data = error.response?.data
+        // When responseType:'blob', parse the blob back to JSON for error details
+        if (data instanceof Blob && data.type?.includes('json')) {
+          try { data = JSON.parse(await data.text()) } catch (_) {}
+        }
         const detail422 = Array.isArray(data?.detail) ? `[${data.detail[0]?.loc?.slice(1).join('.')}] ${data.detail[0]?.msg}` : null
         const message = data?.error || detail422 || error.message || "Wystąpił nieoczekiwany błąd"
         setNotification({ message, type: 'error' })
