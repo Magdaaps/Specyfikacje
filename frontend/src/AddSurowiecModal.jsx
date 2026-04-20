@@ -71,10 +71,14 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec,
     useEffect(() => {
         try {
             setSkladnikiProcenty(JSON.parse(formData.sklad_procentowy || '[]'))
+        } catch (e) {
+            console.error("Error parsing sklad_procentowy", e)
+            setSkladnikiProcenty([])
+        }
+        try {
             setSkladnikiKraje(JSON.parse(formData.pochodzenie_skladnikow || '[]'))
         } catch (e) {
-            console.error("Error parsing JSON data", e)
-            setSkladnikiProcenty([])
+            console.error("Error parsing pochodzenie_skladnikow", e)
             setSkladnikiKraje([])
         }
     }, [surowiec])
@@ -133,15 +137,17 @@ export default function AddSurowiecModal({ onClose, onRefresh, notify, surowiec,
         const items = splitOutsideParens(formData.sklad_pl)
             .filter(s => s.length > 0 && !s.toLowerCase().includes('skład') && !s.toLowerCase().includes('składniki'))
 
+        const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, ' ')
+
         const newProcenty = items.map(name => {
-            const existing = skladnikiProcenty.find(p => p.nazwa === name)
-            return existing || { nazwa: name, procent: 0 }
+            const existing = skladnikiProcenty.find(p => norm(p.nazwa) === norm(name))
+            return existing ? { ...existing, nazwa: name } : { nazwa: name, procent: 0 }
         })
         setSkladnikiProcenty(newProcenty)
 
         const newKraje = items.map(name => {
-            const existing = skladnikiKraje.find(k => k.nazwa === name)
-            return existing || { nazwa: name, kraje: '' }
+            const existing = skladnikiKraje.find(k => norm(k.nazwa) === norm(name))
+            return existing ? { ...existing, nazwa: name } : { nazwa: name, kraje: '' }
         })
         setSkladnikiKraje(newKraje)
 
