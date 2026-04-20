@@ -672,12 +672,20 @@ def generate_pdf(produkt: models.Produkt, lang: str = "pl"):
         return name
 
     def _fmt_origin_pct(p):
-        if p >= 1:      return f'{p:.1f}'.replace('.', ',')
-        if p >= 0.01:   return f'{p:.2f}'.replace('.', ',')
-        if p >= 0.001:  return f'{p:.3f}'.replace('.', ',')
-        if p >= 0.0001: return f'{p:.4f}'.replace('.', ',')
-        if p > 0:       return f'{p:.5f}'.replace('.', ',')
-        return '0'
+        prefix = ""
+        if isinstance(p, str):
+            if p.startswith(('<', '>')):
+                prefix, p = p[0], p[1:]
+            try:
+                p = float(p.replace(',', '.'))
+            except (ValueError, TypeError):
+                return str(p)
+        if p >= 1:      return prefix + f'{p:.1f}'.replace('.', ',')
+        if p >= 0.01:   return prefix + f'{p:.2f}'.replace('.', ',')
+        if p >= 0.001:  return prefix + f'{p:.3f}'.replace('.', ',')
+        if p >= 0.0001: return prefix + f'{p:.4f}'.replace('.', ',')
+        if p > 0:       return prefix + f'{p:.5f}'.replace('.', ',')
+        return prefix + '0'
 
     origin_rows = "".join([
         f'<tr class="data-row">'
