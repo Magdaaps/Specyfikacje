@@ -77,6 +77,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const [activeTab, setActiveTab] = useState('dane_ogolne')
     const [availableSurowce, setAvailableSurowce] = useState([])
     const [showAddMenu, setShowAddMenu] = useState(false)
+    const [surowiecSearch, setSurowiecSearch] = useState('')
     const [suggestions, setSuggestions] = useState({})
     const [imgHeaderFailed, setImgHeaderFailed] = useState(false)
     const [editingSklad, setEditingSklad] = useState(false)
@@ -711,7 +712,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         </h3>
                                         <div className="relative">
                                             <button
-                                                onClick={() => setShowAddMenu(!showAddMenu)}
+                                                onClick={() => { setShowAddMenu(!showAddMenu); setSurowiecSearch('') }}
                                                 className="flex items-center gap-2 text-sm text-choco-600 font-bold hover:text-choco-800 transition-colors bg-white border border-choco-200 px-4 py-2 rounded-xl shadow-sm"
                                             >
                                                 <Plus className="w-4 h-4" />
@@ -719,17 +720,39 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                             </button>
 
                                             {showAddMenu && (
-                                                <div className="absolute right-0 mt-2 w-64 bg-white border border-choco-100 rounded-2xl shadow-2xl z-20 max-h-64 overflow-auto custom-scrollbar p-2 animate-in fade-in zoom-in duration-200">
-                                                    <div className="p-2 text-[10px] font-black text-choco-400 uppercase tracking-widest border-b border-choco-50 mb-2">Wybierz z bazy</div>
-                                                    {availableSurowce.filter(s => !product.skladniki.find(ps => ps.surowiec_id === s.id)).map(s => (
-                                                        <button
-                                                            key={s.id}
-                                                            onClick={() => addSkladnik(s)}
-                                                            className="w-full text-left px-4 py-3 hover:bg-choco-50 rounded-xl text-sm font-bold text-choco-800 transition-colors"
-                                                        >
-                                                            {s.nazwa}
-                                                        </button>
-                                                    ))}
+                                                <div className="absolute right-0 mt-2 w-72 bg-white border border-choco-100 rounded-2xl shadow-2xl z-20 flex flex-col animate-in fade-in zoom-in duration-200">
+                                                    <div className="p-3 border-b border-choco-50">
+                                                        <div className="p-1 text-[10px] font-black text-choco-400 uppercase tracking-widest mb-2">Wybierz z bazy</div>
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            value={surowiecSearch}
+                                                            onChange={e => setSurowiecSearch(e.target.value)}
+                                                            placeholder="Szukaj surowca..."
+                                                            className="w-full bg-choco-50 border border-choco-100 rounded-xl px-3 py-2 text-sm text-choco-800 placeholder-choco-300 focus:outline-none focus:ring-2 focus:ring-choco-200"
+                                                        />
+                                                    </div>
+                                                    <div className="overflow-auto custom-scrollbar max-h-56 p-2">
+                                                        {availableSurowce
+                                                            .filter(s => !product.skladniki.find(ps => ps.surowiec_id === s.id))
+                                                            .filter(s => s.nazwa.toLowerCase().includes(surowiecSearch.toLowerCase()))
+                                                            .map(s => (
+                                                                <button
+                                                                    key={s.id}
+                                                                    onClick={() => { addSkladnik(s); setSurowiecSearch('') }}
+                                                                    className="w-full text-left px-4 py-3 hover:bg-choco-50 rounded-xl text-sm font-bold text-choco-800 transition-colors"
+                                                                >
+                                                                    {s.nazwa}
+                                                                </button>
+                                                            ))
+                                                        }
+                                                        {availableSurowce
+                                                            .filter(s => !product.skladniki.find(ps => ps.surowiec_id === s.id))
+                                                            .filter(s => s.nazwa.toLowerCase().includes(surowiecSearch.toLowerCase()))
+                                                            .length === 0 && (
+                                                            <p className="text-center text-xs text-choco-400 py-4 font-medium">Brak wyników</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
