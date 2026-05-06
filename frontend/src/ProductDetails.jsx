@@ -68,7 +68,7 @@ function fmtPct(p) {
     return p.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',')
 }
 
-const encEan = (e) => encodeURIComponent(e || '~')
+const encEan = (e) => encodeURIComponent(encodeURIComponent(e || '~'))
 
 export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
     const [product, setProduct] = useState(null)
@@ -814,6 +814,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                 const val = product.prawna_nazwa_pl || '';
                                                 if (val.length > 0) fetchSuggestions('prawna_nazwa_pl', val);
                                             }}
+                                            onDoubleClick={() => fetchSuggestions('prawna_nazwa_pl', product.prawna_nazwa_pl || '', true)}
                                             className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 min-h-[100px] resize-y custom-scrollbar"
                                             placeholder="Wpisz nazwę prawną lub opis produktu..."
                                         />
@@ -871,6 +872,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                                     const val = product[field.key] || '';
                                                                     if (val.length > 0) fetchSuggestions(field.key, val);
                                                                 }}
+                                                                onDoubleClick={() => fetchSuggestions(field.key, product[field.key] || '', true)}
                                                                 className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2"
                                                                 placeholder={`Wpisz kod ${field.label}...`}
                                                             />
@@ -934,6 +936,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                                                     onFocus={() => {
                                                                         if (cert.rodzaj.length > 0) fetchSuggestions('certyfikat_rodzaj', cert.rodzaj);
                                                                     }}
+                                                                    onDoubleClick={() => fetchSuggestions('certyfikat_rodzaj', cert.rodzaj, true)}
                                                                     className="w-full bg-transparent border-0 focus:ring-0 text-sm text-choco-800 p-2"
                                                                     placeholder="Np. IFS Food 8.0"
                                                                 />

@@ -148,6 +148,7 @@ def update_produkt(ean: str, produkt: schemas.ProduktCreate, db: Session = Depen
 
 @app.patch("/produkty/{ean}/image")
 def update_product_image(ean: str, image_url: Optional[str] = Body(None, embed=True), db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
     db_produkt = crud.get_produkt(db, ean=ean)
     if db_produkt is None:
         raise HTTPException(status_code=404, detail="Produkt not found")
@@ -321,6 +322,7 @@ def download_card(ean: str, lang: str = "pl", db: Session = Depends(get_db)):
 
 @app.post("/produkty/{ean}/sharepoint")
 def sync_to_sharepoint(ean: str, folder: str, lang: str = "pl", db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
     logger.info(f"Syncing EAN {ean} to SharePoint folder: {folder}")
     db_produkt = crud.get_produkt(db, ean=ean)
     if not db_produkt:
