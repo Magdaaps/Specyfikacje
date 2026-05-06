@@ -128,6 +128,8 @@ def delete_surowiec(surowiec_id: int, db: Session = Depends(get_db)):
 _EAN_EMPTY_SENTINEL = "~"
 
 def _decode_ean(ean: str) -> str:
+    from urllib.parse import unquote
+    ean = unquote(ean)
     return "" if ean == _EAN_EMPTY_SENTINEL else ean
 
 @app.get("/produkty", response_model=List[schemas.Produkt])

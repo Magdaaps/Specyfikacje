@@ -68,6 +68,8 @@ function fmtPct(p) {
     return p.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',')
 }
 
+const encEan = (e) => encodeURIComponent(e || '~')
+
 export default function ProductDetails({ ean, onClose, notify, onRefresh, surowceVersion = 0 }) {
     const [product, setProduct] = useState(null)
     const [initialProduct, setInitialProduct] = useState(null)
@@ -86,7 +88,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const [editingOriginData, setEditingOriginData] = useState(null)
 
     const patchOriginsOverride = (val) => {
-        axios.patch(`${API_BASE}/produkty/${lastSavedEanRef.current}/origins_override`, { origins_override: val }).catch(() => {})
+        axios.patch(`${API_BASE}/produkty/${encEan(lastSavedEanRef.current)}/origins_override`, { origins_override: val }).catch(() => {})
     }
     const userChangedInputRef = useRef(false)
     const palletHeightChangedRef = useRef(false)
@@ -177,8 +179,8 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
         setLoading(true)
         try {
             const [prodRes, analRes, surRes] = await Promise.all([
-                axios.get(`${API_BASE}/produkty/${resolvedEan}`),
-                axios.get(`${API_BASE}/produkty/${resolvedEan}/analiza`),
+                axios.get(`${API_BASE}/produkty/${encEan(resolvedEan)}`),
+                axios.get(`${API_BASE}/produkty/${encEan(resolvedEan)}/analiza`),
                 axios.get(`${API_BASE}/surowce/`)
             ])
             setProduct(prodRes.data)
@@ -218,7 +220,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const handleDownload = async (lang = 'pl') => {
         try {
             const response = await axios({
-                url: `${API_BASE}/produkty/${ean}/download?lang=${lang}`,
+                url: `${API_BASE}/produkty/${encEan(ean)}/download?lang=${lang}`,
                 method: 'GET',
                 responseType: 'blob',
             })
@@ -238,7 +240,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const handleDownloadPDF = async () => {
         try {
             const response = await axios({
-                url: `${API_BASE}/produkty/${ean}/pdf`,
+                url: `${API_BASE}/produkty/${encEan(ean)}/pdf`,
                 method: 'GET',
                 responseType: 'blob',
             })
@@ -258,7 +260,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const handleDownloadPDFEn = async () => {
         try {
             const response = await axios({
-                url: `${API_BASE}/produkty/${ean}/pdf?lang=en`,
+                url: `${API_BASE}/produkty/${encEan(ean)}/pdf?lang=en`,
                 method: 'GET',
                 responseType: 'blob',
             })
@@ -278,8 +280,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const handleDeleteProdukt = async () => {
         if (!window.confirm('Czy na pewno chcesz usunąć ten produkt? Tej operacji nie można cofnąć.')) return
         try {
-            const encodedEan = ean === '' ? '~' : ean
-            await axios.delete(`${API_BASE}/produkty/${encodedEan}`)
+            await axios.delete(`${API_BASE}/produkty/${encEan(ean)}`)
             notify('Produkt usunięty.', 'success')
             onClose()
             if (onRefresh) onRefresh()
@@ -291,7 +292,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
     const handleDownloadExcelEn = async () => {
         try {
             const response = await axios({
-                url: `${API_BASE}/produkty/${ean}/download?lang=en`,
+                url: `${API_BASE}/produkty/${encEan(ean)}/download?lang=en`,
                 method: 'GET',
                 responseType: 'blob',
             })
@@ -318,7 +319,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
             if (!folder) return
 
             setSaving(true)
-            await axios.post(`${API_BASE}/produkty/${ean}/sharepoint?lang=${lang}&folder=${folder}`)
+            await axios.post(`${API_BASE}/produkty/${encEan(ean)}/sharepoint?lang=${lang}&folder=${folder}`)
             notify("Pomyślnie przesłano do SharePoint!", 'success')
         } catch (err) {
             // Global interceptor handles error
@@ -393,7 +394,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                 logistyka_sztuk_na_warstwie: ni(product.logistyka_sztuk_na_warstwie),
                 logistyka_wysokosc_palety: n(product.logistyka_wysokosc_palety)
             }
-            await axios.put(`${API_BASE}/produkty/${lastSavedEanRef.current}`, payload)
+            await axios.put(`${API_BASE}/produkty/${encEan(lastSavedEanRef.current)}`, payload)
             const newEan = product.ean || '~'
             lastSavedEanRef.current = newEan
             notify("Zmiany zostały zapisane pomyślnie!", 'success')
@@ -594,7 +595,7 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         setProduct({ ...product, image_url: newUrl })
                                         setImgHeaderFailed(false)
                                         // Auto-save image_url immediately so it persists without requiring Save
-                                        await axios.patch(`${API_BASE}/produkty/${product.ean}/image`, { image_url: newUrl })
+                                        await axios.patch(`${API_BASE}/produkty/${encEan(product.ean)}/image`, { image_url: newUrl })
                                         notify("Zdjęcie zaktualizowane i zapisane!", "success")
                                     } catch (err) {
                                         const detail = err.response?.data?.detail || err.message || "Nieznany błąd"
@@ -1028,13 +1029,13 @@ export default function ProductDetails({ ean, onClose, notify, onRefresh, surowc
                                         <div className="flex items-center gap-2">
                                             {editingSklad ? (
                                                 <>
-                                                    <button onClick={async () => { const val = skladTextEdit || null; setProduct(p => ({ ...p, sklad_text: val })); setEditingSklad(false); try { await axios.patch(`${API_BASE}/produkty/${lastSavedEanRef.current}/sklad_text`, { sklad_text: val }) } catch(e) { notify('Błąd zapisu składu', 'error') } }} className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded-lg transition-colors"><Check className="w-3 h-3" />Zatwierdź</button>
+                                                    <button onClick={async () => { const val = skladTextEdit || null; setProduct(p => ({ ...p, sklad_text: val })); setEditingSklad(false); try { await axios.patch(`${API_BASE}/produkty/${encEan(lastSavedEanRef.current)}/sklad_text`, { sklad_text: val }) } catch(e) { notify('Błąd zapisu składu', 'error') } }} className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded-lg transition-colors"><Check className="w-3 h-3" />Zatwierdź</button>
                                                     <button onClick={() => setEditingSklad(false)} className="flex items-center gap-1 text-[10px] font-bold text-choco-500 hover:text-choco-700 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors"><X className="w-3 h-3" />Anuluj</button>
                                                 </>
                                             ) : (
                                                 <>
                                                     <button onClick={() => { setSkladTextEdit(product.sklad_text || liveIngredientsText || ''); setEditingSklad(true) }} className="flex items-center gap-1 text-[10px] font-bold text-choco-500 hover:text-choco-700 bg-choco-50 hover:bg-choco-100 border border-choco-200 px-2.5 py-1 rounded-lg transition-colors"><Pencil className="w-3 h-3" />Edytuj</button>
-                                                    {product.sklad_text && <button onClick={async () => { setProduct(p => ({ ...p, sklad_text: null })); try { await axios.patch(`${API_BASE}/produkty/${lastSavedEanRef.current}/sklad_text`, { sklad_text: null }) } catch(e) { notify('Błąd zapisu składu', 'error') } }} className="flex items-center gap-1 text-[10px] font-bold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors"><RotateCcw className="w-3 h-3" />Przywróć auto</button>}
+                                                    {product.sklad_text && <button onClick={async () => { setProduct(p => ({ ...p, sklad_text: null })); try { await axios.patch(`${API_BASE}/produkty/${encEan(lastSavedEanRef.current)}/sklad_text`, { sklad_text: null }) } catch(e) { notify('Błąd zapisu składu', 'error') } }} className="flex items-center gap-1 text-[10px] font-bold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors"><RotateCcw className="w-3 h-3" />Przywróć auto</button>}
                                                 </>
                                             )}
                                         </div>
