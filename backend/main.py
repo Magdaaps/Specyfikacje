@@ -154,31 +154,6 @@ def update_product_image(ean: str, image_url: Optional[str] = Body(None, embed=T
     logger.info(f"Image URL updated for EAN {ean}: {image_url}")
     return {"image_url": db_produkt.image_url}
 
-@app.get("/produkty/{ean}", response_model=schemas.Produkt)
-def read_produkt(ean: str, db: Session = Depends(get_db)):
-    ean = _decode_ean(ean)
-    db_produkt = crud.get_produkt(db, ean=ean)
-    if db_produkt is None:
-        raise HTTPException(status_code=404, detail="Produkt not found")
-    return db_produkt
-
-@app.delete("/produkty/{ean}")
-def delete_produkt(ean: str, db: Session = Depends(get_db)):
-    ean = _decode_ean(ean)
-    db_produkt = crud.delete_produkt(db=db, ean=ean)
-    if db_produkt is None:
-        raise HTTPException(status_code=404, detail="Produkt not found")
-    logger.info(f"DB: Deleted produkt EAN={ean}")
-    return {"ok": True}
-
-@app.post("/produkty", response_model=schemas.Produkt)
-def create_produkt(produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
-    # Check if exists
-    db_existing = crud.get_produkt(db, ean=produkt.ean)
-    if db_existing:
-        raise HTTPException(status_code=400, detail="EAN already registered")
-    return crud.create_produkt(db=db, produkt=produkt)
-
 @app.get("/produkty/sugestie/organoleptyka")
 def get_organoleptyka_suggestions(
     field: str, 
@@ -258,7 +233,30 @@ def get_organoleptyka_suggestions(
         results = db.execute(query.distinct().limit(10)).scalars().all()
         return [r for r in results if r]
 
+@app.get("/produkty/{ean}", response_model=schemas.Produkt)
+def read_produkt(ean: str, db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
+    db_produkt = crud.get_produkt(db, ean=ean)
+    if db_produkt is None:
+        raise HTTPException(status_code=404, detail="Produkt not found")
+    return db_produkt
 
+@app.delete("/produkty/{ean}")
+def delete_produkt(ean: str, db: Session = Depends(get_db)):
+    ean = _decode_ean(ean)
+    db_produkt = crud.delete_produkt(db=db, ean=ean)
+    if db_produkt is None:
+        raise HTTPException(status_code=404, detail="Produkt not found")
+    logger.info(f"DB: Deleted produkt EAN={ean}")
+    return {"ok": True}
+
+@app.post("/produkty", response_model=schemas.Produkt)
+def create_produkt(produkt: schemas.ProduktCreate, db: Session = Depends(get_db)):
+    # Check if exists
+    db_existing = crud.get_produkt(db, ean=produkt.ean)
+    if db_existing:
+        raise HTTPException(status_code=400, detail="EAN already registered")
+    return crud.create_produkt(db=db, produkt=produkt)
 
 
 # Business Logic Endpoints
